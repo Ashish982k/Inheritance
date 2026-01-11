@@ -8,14 +8,12 @@ import User from "./database/mongo.js";
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   providers: [
-    Google,
-    GitHub,
-    Facebook,
+    Google, GitHub, Facebook
   ],
+
   session: {
     strategy: "jwt",
-  
-    maxAge: 60 * 60 * 24 * 3,
+    maxAge: 60 * 60 * 24 * 3, 
   },
 
   callbacks: {
@@ -23,49 +21,31 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       try {
         await connectDB();
 
-        // Write/update user document even if email is missing (e.g., GitHub private email)
-        const email = user?.email || undefined;
-        const provider = account?.provider;
-        const providerAccountId = account?.providerAccountId;
+        const email = user.email || null;
+        const provider = account.provider;
+        const providerAccountId = account.providerAccountId;
 
         const filter = email
-          ? ({
-              $or: [
-                { email },
-                provider && providerAccountId ? { provider, providerAccountId } : { email },
-              ],
-            } as any)
-          : (provider && providerAccountId
-              ? { provider, providerAccountId }
-              : { email: null }) as any;
+          ? { $or: [{ email }, { provider, providerAccountId }] }
+          : { provider, providerAccountId };
 
-        const upserted = await (User as any).findOneAndUpdate(
-          filter,
+        const upserted = await User.findOneAndUpdate(
+          filter as any,
           {
             name: user.name,
-            email: email ?? null,
+            email,
             image: user.image,
             provider,
             providerAccountId,
           },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
+          { upsert: true, new: true }
         );
 
-        if (process.env.NODE_ENV !== "production") {
-          console.log("Auth upsert user:", {
-            filter,
-            _id: upserted?._id?.toString?.(),
-            email: upserted?.email,
-            provider: upserted?.provider,
-            providerAccountId: upserted?.providerAccountId,
-          });
-        }
-
-        // ✅ ALWAYS allow login
+        console.log("User saved:", upserted && upserted._id.toString());
         return true;
       } catch (err) {
         console.error("Sign-in error:", err);
-        return true; // IMPORTANT: don't block OAuth
+        return true; 
       }
     },
   },
