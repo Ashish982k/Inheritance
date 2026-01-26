@@ -1,22 +1,27 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { auth } from "../../../auth";
+import chatModel from "../../../database/chat.js";
+import { connectDB } from "../../../database/db.js";
+import { connect } from "node:http2";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export async function POST(req) {
   try {
+    await connectDB();
     const { message } = await req.json();
 
     console.log("User message:", message);
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-
     const intentPrompt = `
 Classify the following message strictly as either:
 
 SYMPTOM
 CHAT
+HISTORY
 
 Message: "${message}"
 
@@ -25,7 +30,6 @@ Reply with only one word.
 
     const intentResult = await model.generateContent(intentPrompt);
     const intent = intentResult.response.text().trim();
-
 
     if (intent === "CHAT") {
       const chatPrompt = `
@@ -41,17 +45,64 @@ Reply naturally and politely to this message:
       return NextResponse.json({ reply });
     }
 
+    if (intent === "HISTORY") {
+      const session = await auth();
+      const userId = session?.user?.id;
+
+      if (!userId) {
+        return NextResponse.json({ messages: [] });
+      }
+
+      const history = await chatModel.findOne(
+        { userId },
+        { messages: { $slice: -10 } }
+      );
+
+      const last = history?.messages?.[0];
+      if (!last) {
+        return NextResponse.json({
+          reply: "No medical history found.",
+        });
+      }
+      
+      const historyText = history.messages.map(
+          (m, i) =>
+            `${i + 1}. Disease: ${m.disease}, Confidence: ${m.confidence}%`
+        )
+        .join("\n");
+      const prompt = `
+You are a medical assistant chatbot.
+
+The following is the user's verified medical history retrieved from the system database.
+You ARE allowed to use it to answer the user.
+
+Disease history:
+${historyText}
+
+User question:
+"${message}"
+
+Answer only using this history.
+If the history does not contain the answer, say so clearly.
+Do NOT say you don't have access to records.
+`;
+      const historyResult = await model.generateContent(prompt);
+      const reply = historyResult.response.text();
+      return NextResponse.json({ reply });
+    }
 
     const result = await fetch(
       "https://biobert-api-630237788367.asia-south1.run.app/predict",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: message }), 
+        body: JSON.stringify({ text: message }),
       }
     );
 
     const response = await result.json();
+    const session = await auth();
+    const userId = session?.user?.id;
 
     console.log("ML response:", response);
 
@@ -59,7 +110,23 @@ Reply naturally and politely to this message:
     const confidence = response.confidence_score;
     const confidencePercent = (confidence * 100).toFixed(2);
 
+    if (userId && disease && confidence !== undefined) {
+      const text = response.input_text;
 
+      await chatModel.updateOne(
+        { userId },
+        {
+          $push: {
+            messages: {
+              text,
+              disease,
+              confidence: parseFloat(confidencePercent),
+            },
+          },
+        },
+        { upsert: true }
+      );
+    }
     const prompt = `
 You are a medical assistant chatbot.
 

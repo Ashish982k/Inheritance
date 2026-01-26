@@ -2,6 +2,7 @@ import { Poppins, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { auth } from "../auth";
+import TransitionProvider from "./transition-provider";
 
 const poppins = Poppins({
   variable: "--font-geist-sans",
@@ -26,16 +27,16 @@ export default async function RootLayout({ children }) {
       <body
         className={`${poppins.variable} ${GeistMono.variable} antialiased`}
       >
-        <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur supports-[backdrop-filter]:bg-black/60">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+        <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur supports-[backdrop-filter]:bg-black/60 animate-fade-in">
+          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 glass">
             <Link href="/" className="flex items-center gap-3">
               {/* Image */}
               <span className="text-sm font-semibold tracking-wide text-zinc-100">AI-Symptom</span>
             </Link>
             <nav className="flex items-center gap-6 text-base font-semibold">
-              <Link href="/" className="text-zinc-300 hover:text-white transition-colors">Home</Link>
-              <Link href="/chatbot" className="text-zinc-300 hover:text-white transition-colors">Chatbot</Link>
-              <Link href="/contact" className="text-zinc-300 hover:text-white transition-colors">Contact</Link>
+              <Link href="/" className="text-zinc-300 hover:text-white transition-colors hover-lift">Home</Link>
+              <Link href="/chatbot" className="text-zinc-300 hover:text-white transition-colors hover-lift">Chatbot</Link>
+              <Link href="/contact" className="text-zinc-300 hover:text-white transition-colors hover-lift">Contact</Link>
               
                 <Link href="/login" className="text-zinc-300 hover:text-white transition-colors">{session?.user ? (
                 <div className="flex items-center gap-3 max-w-[16rem]">
@@ -59,7 +60,9 @@ export default async function RootLayout({ children }) {
           </div>
         </header>
         <main className="min-h-[calc(100dvh-4rem)] w-full px-4 py-8">
-          {children}
+          <TransitionProvider>
+            {children}
+          </TransitionProvider>
         </main>
       </body>
     </html>
