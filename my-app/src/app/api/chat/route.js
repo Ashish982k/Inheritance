@@ -5,6 +5,7 @@ import chatModel from "../../../database/chat.js";
 import { connectDB } from "../../../database/db.js";
 import { connect } from "node:http2";
 
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export async function POST(req) {
@@ -75,6 +76,7 @@ You are a medical assistant chatbot.
 
 The following is the user's verified medical history retrieved from the system database.
 You ARE allowed to use it to answer the user.
+-Do NOT use **, ###, --- or bullet symbols.
 
 Disease history:
 ${historyText}
@@ -92,13 +94,15 @@ Do NOT say you don't have access to records.
     }
 
     const result = await fetch(
-      "https://biobert-api-630237788367.asia-south1.run.app/predict",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: message }),
-      }
-    );
+    "http://localhost:8000/predict",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text: message }),
+    }
+  );
 
     const response = await result.json();
     const session = await auth();
@@ -106,12 +110,12 @@ Do NOT say you don't have access to records.
 
     console.log("ML response:", response);
 
-    const disease = response.predicted_disease;
-    const confidence = response.confidence_score;
-    const confidencePercent = (confidence * 100).toFixed(2);
+    const disease = response.disease;
+    const confidence = response.confidence;
+   
 
     if (userId && disease && confidence !== undefined) {
-      const text = response.input_text;
+      const text = response.inputs;
 
       await chatModel.updateOne(
         { userId },
@@ -120,7 +124,7 @@ Do NOT say you don't have access to records.
             messages: {
               text,
               disease,
-              confidence: parseFloat(confidencePercent),
+              confidence: parseFloat(confidence.toFixed(4)),
             },
           },
         },
@@ -132,7 +136,7 @@ You are a medical assistant chatbot.
 
 ML Prediction:
 Disease: ${disease}
-Confidence: ${confidencePercent}%
+Confidence: ${confidence}%
 
 Rules:
 - Write in short paragraphs.
@@ -151,7 +155,7 @@ Now respond to the user.
     return NextResponse.json({
       reply,
       disease,
-      confidence: confidencePercent,
+      confidence,
     });
   } catch (err) {
     console.error("CHAT API ERROR:", err);
