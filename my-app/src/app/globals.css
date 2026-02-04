@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000; /* pure black background */
+  --foreground: #e6f4f1; /* soft off-white with slight cyan tint */
+  --accent: #0f766e;     /* dark teal */
+  --accent-strong: #0ea5a4; /* cyan-teal */
+  --accent-emerald: #10b981; /* emerald */
 }
 
 /* Generic animation utilities */
@@ -24,16 +27,16 @@
   to { opacity: 1; transform: translateY(0) }
 }
 
-/* Subtle glassmorphism surface */
+
 .glass {
-  background: linear-gradient(180deg, rgba(24,24,27,.55), rgba(24,24,27,.35));
+  background: linear-gradient(180deg, rgba(10,17,17,.6), rgba(10,17,17,.4));
   backdrop-filter: saturate(140%) blur(10px);
   -webkit-backdrop-filter: saturate(140%) blur(10px);
-  border: 1px solid rgba(255,255,255,.08);
-  box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+  border: 1px solid rgba(16,185,129,.12); /* faint emerald border */
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 20px rgba(15,118,110,.12), inset 0 1px 0 rgba(255,255,255,.04);
 }
 
-/* Interactive helpers */
+
 .hover-lift {
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
@@ -51,8 +54,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #000000; /* pure black in dark mode as well */
+    --foreground: #e6f4f1;
   }
 }
 
@@ -64,7 +67,7 @@ body {
 
 /* Animated gradient for headings */
 .gradient-flow {
-  background-image: linear-gradient(90deg, #22d3ee, #a78bfa, #f472b6, #22d3ee);
+  background-image: linear-gradient(90deg, var(--accent-strong), var(--accent-emerald), var(--accent), var(--accent-strong));
   background-size: 200% 100%;
   animation: gradient-move 6s linear infinite;
 }

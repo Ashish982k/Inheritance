@@ -101,7 +101,7 @@ export default function ChatbotPage() {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-md bg-zinc-200 px-4 py-2 text-sm font-medium text-black hover:bg-white disabled:opacity-50"
+              className="rounded-md bg-[#0fd4c3]/90 px-4 py-2 text-sm font-medium text-black hover:bg-[#0fd4c3]/90 disabled:opacity-50"
             >
               {busy ? "Sending..." : "Send"}
             </button>
