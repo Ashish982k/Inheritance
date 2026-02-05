@@ -3,3 +3,7 @@ pydantic
 numpy
 scikit-learn
 uvicorn
+torch
+torchvision
+pillow
+python-multipart

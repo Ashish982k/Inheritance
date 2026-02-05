@@ -12,6 +12,54 @@ export default function ChatbotPage() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const bottomRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  async function downscaleImage(file, { maxSize = 768, quality = 0.8 } = {}) {
+    try {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (!w || !h) {
+        URL.revokeObjectURL(objectUrl);
+        return file;
+      }
+
+      const scale = Math.min(1, maxSize / Math.max(w, h));
+      if (scale >= 1) {
+        URL.revokeObjectURL(objectUrl);
+        return file;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        URL.revokeObjectURL(objectUrl);
+        return file;
+      }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+
+      const blob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", quality)
+      );
+      if (!blob) return file;
+
+      const name = (file.name || "upload").replace(/\.[^.]+$/, "") + ".jpg";
+      return new File([blob], name, { type: "image/jpeg" });
+    } catch {
+      return file;
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -62,6 +110,57 @@ export default function ChatbotPage() {
         {
           role: "assistant",
           content: "Something went wrong. Please try again.",
+        },
+      ]);
+    }
+
+    setBusy(false);
+  }
+
+  async function handleImageUpload(file) {
+    if (!file || busy) return;
+    setBusy(true);
+
+    setMessages((cur) => [
+      ...cur,
+      { role: "user", content: `Uploaded image: ${file.name || "image"}` },
+      { role: "assistant", content: "Uploading image..." },
+    ]);
+
+    try {
+      const optimized = await downscaleImage(file);
+      const form = new FormData();
+      form.append("file", optimized);
+
+      const res = await fetch("/api/predict-image", {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "API error");
+
+      const preds = Array.isArray(data?.predictions) ? data.predictions : [];
+      const top1 = preds.length > 0 ? preds[0] : null;
+      const label = top1?.disease ? `Predicted disease from image: ${top1.disease}` : "Image prediction completed.";
+
+      setMessages((cur) => [
+        ...cur,
+        {
+          role: "assistant",
+          content: label,
+          disease: top1?.disease,
+          confidence: top1?.confidence,
+          predictions: preds,
+        },
+      ]);
+    } catch (err) {
+      const msg = err?.message ? String(err.message) : "Image upload failed. Please try again.";
+      setMessages((cur) => [
+        ...cur,
+        {
+          role: "assistant",
+          content: msg,
         },
       ]);
     }
@@ -255,6 +354,26 @@ export default function ChatbotPage() {
                   <div className="text-zinc-300/80" title="Voice input coming soon">🎙</div>
                 </div>
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  handleImageUpload(file);
+                }}
+              />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => fileInputRef.current?.click()}
+                className="btn-press h-[44px] rounded-2xl bg-white/10 hover:bg-white/15 text-zinc-100 px-4 text-sm font-semibold border border-white/10 disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Upload image"
+              >
+                📷
+              </button>
               <button
                 type="submit"
                 disabled={busy || !input.trim()}
