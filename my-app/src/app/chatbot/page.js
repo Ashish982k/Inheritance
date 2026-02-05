@@ -32,15 +32,23 @@ export default function ChatbotPage() {
       if (!res.ok) throw new Error("API error");
 
       const data = await res.json();
+      console.log("/api/chat response:", data);
+      console.log("Predictions:", data?.predictions);
+      console.log("Precautions:", data?.precautions);
 
-      
+      const top1 = Array.isArray(data?.predictions) && data.predictions.length > 0 ? data.predictions[0] : null;
+
       setMessages((cur) => [
         ...cur,
         {
           role: "assistant",
           content: data.reply,
-          disease: data.disease,
-          confidence: data.confidence,
+          disease: top1?.disease,
+          confidence: top1?.confidence,
+          predictions: data?.predictions,
+          precautions: data?.precautions,
+          historyReport: data?.historyReport,
+          history: data?.history,
         },
       ]);
     } catch (err) {
@@ -57,21 +65,57 @@ export default function ChatbotPage() {
   }
 
   return (
-    <section className="flex h-[calc(100dvh-4rem)] w-full flex-col bg-black">
-      <div className="w-full h-full flex-1 p-4 sm:p-6">
-        <div className="flex h-full flex-col rounded-xl border border-white/10 bg-zinc-900/40">
-          <div className="border-b border-white/10 p-3 text-sm font-medium text-zinc-200">
-            Medical Chatbot
-          </div>
+    <section className="relative min-h-[calc(100dvh-4rem)] w-full flex flex-col">
+      {/* Ambient background layers */}
+      <div className="noise-overlay" />
+      <div className="bg-grid" />
 
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      {/* Hero: title + input */}
+      <div className="relative z-10 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pt-4">
+        <div className="relative overflow-hidden glass card rounded-[24px] px-6 py-8">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="ecg-line" />
+          </div>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-wide text-white">
+            <span className="gradient-flow bg-clip-text text-transparent">AI Health Prediction System</span>
+          </h1>
+          <p className="mt-2 text-sm sm:text-base text-zinc-300">Early insights. Smarter care.</p>
+
+          <form onSubmit={handleSend} className="mt-6 flex items-center gap-3 glass-strong rounded-2xl p-2.5">
+            <div className="flex-1 flex items-center gap-2">
+              <span className="text-zinc-400">📝</span>
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Describe your symptoms..."
+                className="w-full bg-transparent outline-none text-zinc-100 placeholder:text-zinc-500 text-sm sm:text-base"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={busy}
+              className="btn-press rounded-xl bg-cyan-400/90 hover:bg-cyan-300 text-black px-4 py-2 text-sm font-semibold shadow-[0_0_20px_rgba(34,211,238,0.35)] disabled:opacity-60"
+            >
+              {busy ? "Sending..." : "Send"}
+            </button>
+            <div className="text-zinc-300/80" title="Voice input coming soon">🎙</div>
+          </form>
+        </div>
+      </div>
+
+      {/* Conversation Panel */}
+      <div className="relative z-10 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pb-6 flex-1">
+        <div className="mt-6 glass card rounded-[24px] min-h-[50vh] flex flex-col">
+          <div className="border-b border-white/10 p-4 text-sm font-medium text-zinc-200">Medical Chatbot</div>
+
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
             {messages.map((m, i) => (
               <div
                 key={i}
                 className={
                   m.role === "user"
-                    ? "ml-auto max-w-[80%] rounded-lg bg-zinc-800 px-4 py-2 text-zinc-100"
-                    : "mr-auto max-w-[80%] rounded-lg bg-zinc-700 px-4 py-2 text-zinc-100"
+                    ? "ml-auto max-w-[80%] rounded-2xl glass-strong px-4 py-3 text-zinc-100 animate-slide-up"
+                    : "mr-auto max-w-[80%] rounded-2xl glass px-4 py-3 text-zinc-100 animate-slide-up"
                 }
               >
                 {/* Assistant structured output */}
@@ -83,29 +127,125 @@ export default function ChatbotPage() {
                 )}
 
                 <p className="text-sm leading-relaxed">{m.content}</p>
+
+                {/* Prediction Results: Top 3 with circular progress rings */}
+                {m.role === "assistant" && Array.isArray(m.predictions) && m.predictions.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-sm font-medium text-zinc-200 mb-2">Prediction Results</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {m.predictions.slice(0,3).map((p, idx) => {
+                        const pct = Math.max(0, Math.min(100, Math.round(Number(p.confidence) || 0)));
+                        return (
+                          <div key={idx} className="glass-strong rounded-2xl p-3 flex items-center gap-3">
+                            <div className="ring" style={{"--p": pct}} data-p={pct}>
+                              <div className="ring-label">{pct}%</div>
+                            </div>
+                            <div>
+                              <div className="text-zinc-100 font-semibold text-sm">{p.disease}</div>
+                              <div className="text-xs text-zinc-400">Confidence</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {m.role === "assistant" && m.precautions?.diseases && (
+                  <div className="mt-3 text-sm">
+                    <div className="font-semibold mb-1">🩺 Medical Assistant</div>
+                    <div className="text-zinc-300 mb-2">Based on common symptoms, here are some possible conditions and precautions. This is not a diagnosis.</div>
+                    <div className="space-y-3">
+                      {m.precautions.diseases.map((d, idx) => {
+                        const syms = Array.isArray(d.common_symptoms) ? d.common_symptoms.slice(0, 3) : [];
+                        const precs = Array.isArray(d.precautions) ? d.precautions.slice(0, 3) : [];
+                        // Try to map a confidence from predictions if present
+                        const pred = Array.isArray(m.predictions) ? m.predictions.find(p => p.disease === d.name) : null;
+                        const confidence = pred ? Math.round(Number(pred.confidence)) : null;
+                        return (
+                          <div key={idx} className="rounded-lg bg-zinc-800/50 border border-white/10 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-zinc-100">{d.name}</span>
+                              {confidence !== null && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${confidence < 70 ? 'bg-blue-200 text-blue-900' : confidence < 85 ? 'bg-green-200 text-green-900' : 'bg-emerald-300 text-emerald-900'}`}>Confidence: {confidence}%</span>
+                              )}
+                            </div>
+                            {syms.length > 0 && (
+                              <div className="mt-1">
+                                <strong className="text-zinc-200">Symptoms</strong>
+                                <ul className="list-disc pl-5 mt-1 text-zinc-200">
+                                  {syms.map((s, i) => (<li key={i}>{s}</li>))}
+                                </ul>
+                              </div>
+                            )}
+                            {precs.length > 0 && (
+                              <div className="mt-2">
+                                <strong className="text-zinc-200">Precautions</strong>
+                                <ul className="list-disc pl-5 mt-1 text-zinc-200">
+                                  {precs.map((p, i) => (<li key={i}>{p}</li>))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {m.precautions.disclaimer && (
+                      <div className="text-xs text-zinc-300 mt-2">{m.precautions.disclaimer}</div>
+                    )}
+                  </div>
+                )}
+
+                {m.role === "assistant" && Array.isArray(m.historyReport) && m.historyReport.length > 0 && (
+                  <div className="mt-3 text-sm">
+                    <div className="font-semibold mb-1">Last 10 predictions</div>
+                    <ul className="space-y-1">
+                      {m.historyReport.map((r, i) => (
+                        <li key={i} className="flex items-center justify-between bg-zinc-800/40 rounded-md px-3 py-1.5">
+                          <span className="text-zinc-100">{r.disease}</span>
+                          <span className="text-xs text-zinc-300">{r.count}x · max {Math.round(r.maxConfidence)}%</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {m.role === "assistant" && Array.isArray(m.history) && m.history.length > 0 && (
+                  <div className="mt-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold mb-1">Medical History (Last 10)</div>
+                      <a
+                        href="/api/history/pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs rounded-md bg-[#0fd4c3]/90 px-3 py-1 text-black hover:bg-[#0fd4c3]"
+                      >
+                        Download PDF
+                      </a>
+                    </div>
+                    <ul className="space-y-1">
+                      {m.history.map((h, i) => (
+                        <li key={i} className="bg-zinc-800/40 rounded-md px-3 py-1.5">
+                          <div className="text-zinc-300 text-xs mb-1">{h.createdAt ? new Date(h.createdAt).toLocaleString() : ''}</div>
+                          <div className="text-zinc-100">
+                            {Array.isArray(h.predictions) && h.predictions.length > 0
+                              ? h.predictions.map((p, idx) => (
+                                  <span key={idx} className="mr-2">{p.disease} ({Math.round(Number(p.confidence) || 0)}%)</span>
+                                ))
+                              : '(no predictions)'}
+                          </div>
+                          {h.text && (
+                            <div className="text-zinc-200 text-xs mt-1">Input: {h.text}</div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ))}
           </div>
 
-          <form
-            onSubmit={handleSend}
-            className="flex items-center gap-2 border-t border-white/10 p-3"
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your symptoms..."
-              className="flex-1 rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-2 focus:ring-white/20"
-            />
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-md bg-[#0fd4c3]/90 px-4 py-2 text-sm font-medium text-black hover:bg-[#0fd4c3]/90 disabled:opacity-50"
-            >
-              {busy ? "Sending..." : "Send"}
-            </button>
-          </form>
         </div>
       </div>
     </section>

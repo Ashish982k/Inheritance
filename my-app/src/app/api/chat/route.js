@@ -3,55 +3,169 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "../../../auth";
 import chatModel from "../../../database/chat.js";
 import { connectDB } from "../../../database/db.js";
-import { connect } from "node:http2";
-
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Basic API key validation at module load
+if (!process.env.GEMINI_API_KEY) {
+  console.error("GEMINI_API_KEY is not set. Gemini calls will fail.");
+}
+
+// Helper: translate assistant text back to the language of the original user message
+async function translateBackToUserLanguage(model, originalMessage, assistantText) {
+  const backPrompt = `Translate the following assistant reply into the SAME LANGUAGE as the ORIGINAL USER MESSAGE.\n\nRULES:\n- Output ONLY the translated reply text.\n- No explanations or extra text.\n\nORIGINAL USER MESSAGE:\n"""${originalMessage}"""\n\nASSISTANT REPLY (to translate):\n"""${assistantText}"""`;
+  const backRes = await callModelWithRetry(model, backPrompt);
+  return (backRes.response.text() || assistantText).trim();
+}
+
+// Retry helper with exponential backoff for Gemini calls
+async function callModelWithRetry(model, input, { tries = 3, baseDelayMs = 500 } = {}) {
+  let lastErr;
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try {
+      if (Array.isArray(input)) {
+        return await model.generateContent(input);
+      } else {
+        return await model.generateContent(input);
+      }
+    } catch (err) {
+      lastErr = err;
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      console.warn(`Gemini call failed (attempt ${attempt}/${tries}). Retrying in ${delay}ms`, err?.message || err);
+      if (attempt < tries) {
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+/* --------------------------------------------------
+   Gemini helper: Precautions JSON (NEW SCHEMA)
+-------------------------------------------------- */
+async function getPrecautionsJSON(model, predictions) {
+  const systemPrompt = `
+You are a system that provides precautionary guidance.
+
+IMPORTANT RULES:
+1. You MUST respond ONLY in valid JSON.
+2. Do NOT include explanations, markdown, or extra text outside JSON.
+3. Do NOT add comments.
+4. Do NOT include trailing commas.
+5. If information is unknown, use null.
+6. Follow the exact JSON schema below.
+
+JSON SCHEMA:
+{
+  "disclaimer": string,
+  "diseases": [
+    {
+      "name": string,
+      "type": string | null,
+      "common_symptoms": string[] | null,
+      "precautions": string[] | null,
+      "medical_attention_required": boolean | null
+    }
+  ]
+}
+
+OUTPUT INSTRUCTIONS:
+- Include a concise, general-purpose medical disclaimer in "disclaimer".
+- In "diseases", include 3–5 relevant conditions based on the user's symptoms/predictions.
+- Each disease must list 3–6 common symptoms and 3–6 practical precautions.
+- Use short, safety-focused sentences.
+- Do not include medication names.
+`;
+
+  const userPrompt = `
+User's top predictions (name and confidence):
+${JSON.stringify(predictions, null, 2)}
+
+Return a JSON object following the exact schema above, populated with appropriate conditions and precautions that are relevant to the predictions.
+`;
+
+  const prompt = `${systemPrompt}\n\n${userPrompt}`;
+  const result = await callModelWithRetry(model, prompt);
+  let text = result.response.text().trim();
+  // Handle possible code fences just in case
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?/i, "").replace(/```\s*$/i, "").trim();
+  }
+  return JSON.parse(text);
+}
+
+/* --------------------------------------------------
+   POST Handler
+-------------------------------------------------- */
 export async function POST(req) {
   try {
     await connectDB();
-    const { message } = await req.json();
 
+    const { message } = await req.json();
     console.log("User message:", message);
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash"
+    });
 
+    // Translate to English first (multilingual support)
+    const translatePrompt = `Translate the following user message to natural English.\n\nRULES:\n- Output ONLY the translated text.\n- No explanations or extra text.\n\nMessage:\n"""${message}"""`;
+    const translateResult = await callModelWithRetry(model, translatePrompt);
+    const translated = (translateResult.response.text() || "").trim();
+    const englishMessage = translated.length > 0 ? translated : message;
+    console.log("Translated message (en):", englishMessage);
+
+    // Detect original language (ISO 639-1 code). Default to 'en' on failure
+    let origLang = 'en';
+    try {
+      const detectLangPrompt = `Detect the language of the following text and return ONLY the ISO 639-1 code (e.g., en, hi, es, fr). No extra text.\n\nText:\n"""${message}"""`;
+      const langRes = await callModelWithRetry(model, detectLangPrompt);
+      const code = (langRes.response.text() || '').trim().toLowerCase();
+      if (/^[a-z]{2}$/.test(code)) origLang = code;
+    } catch {}
+    console.log("Original language code:", origLang);
+
+    /* ---------- INTENT CLASSIFICATION ---------- */
     const intentPrompt = `
-Classify the following message strictly as either:
+Classify the following message strictly as one word:
 
 SYMPTOM
 CHAT
 HISTORY
 
-Message: "${message}"
-
-Reply with only one word.
+Message: "${englishMessage}"
 `;
 
-    const intentResult = await model.generateContent(intentPrompt);
+    const intentResult = await callModelWithRetry(model, intentPrompt);
     const intent = intentResult.response.text().trim();
+    console.log("Intent:", intent);
 
+    /* ---------- NORMAL CHAT ---------- */
     if (intent === "CHAT") {
       const chatPrompt = `
-You are a friendly medical assistant chatbot.
-Reply naturally and politely to this message:
+You are a friendly medical assistant.
+Reply politely and naturally.
 
-"${message}"
+User message:
+"${englishMessage}"
 `;
-
-      const chatResult = await model.generateContent(chatPrompt);
-      const reply = chatResult.response.text();
-
-      return NextResponse.json({ reply });
+      const chatResult = await callModelWithRetry(model, chatPrompt);
+      let chatReply = chatResult.response.text();
+      chatReply = await translateBackToUserLanguage(model, message, chatReply);
+      return NextResponse.json({
+        reply: chatReply
+      });
     }
 
+    /* ---------- HISTORY QUERY ---------- */
     if (intent === "HISTORY") {
       const session = await auth();
       const userId = session?.user?.id;
 
       if (!userId) {
-        return NextResponse.json({ messages: [] });
+        return NextResponse.json({
+          reply: "No medical history found."
+        });
       }
 
       const history = await chatModel.findOne(
@@ -59,108 +173,182 @@ Reply naturally and politely to this message:
         { messages: { $slice: -10 } }
       );
 
-      const last = history?.messages?.[0];
-      if (!last) {
+      if (!history || history.messages.length === 0) {
         return NextResponse.json({
-          reply: "No medical history found.",
+          reply: "No medical history found."
         });
       }
-      
-      const historyText = history.messages.map(
-          (m, i) =>
-            `${i + 1}. Disease: ${m.disease}, Confidence: ${m.confidence}%`
+
+      const last10 = history.messages || [];
+      const historyText = last10
+        .map((m, i) =>
+          `${i + 1}. ${m.predictions
+            .map(p => `${p.disease} (${p.confidence}%)`)
+            .join(", ")}`
         )
         .join("\n");
-      const prompt = `
-You are a medical assistant chatbot.
 
-The following is the user's verified medical history retrieved from the system database.
-You ARE allowed to use it to answer the user.
--Do NOT use **, ###, --- or bullet symbols.
+      const historyPrompt = `
+You are a medical assistant.
 
-Disease history:
+The following is verified medical history.
+
 ${historyText}
 
 User question:
-"${message}"
+"${englishMessage}"
 
 Answer only using this history.
-If the history does not contain the answer, say so clearly.
-Do NOT say you don't have access to records.
+If not available, clearly say so.
 `;
-      const historyResult = await model.generateContent(prompt);
-      const reply = historyResult.response.text();
-      return NextResponse.json({ reply });
+
+      const historyResult = await callModelWithRetry(model, historyPrompt);
+      let historyReply = historyResult.response.text();
+      historyReply = await translateBackToUserLanguage(model, message, historyReply);
+
+      // Return both the LLM summary and the raw last-10 history records
+      return NextResponse.json({
+        reply: historyReply,
+        history: last10.map(m => ({
+          text: m.text,
+          predictions: m.predictions,
+          createdAt: m.createdAt
+        }))
+      });
     }
 
-    const result = await fetch(
-    "http://localhost:8000/predict",
-    {
+    /* ---------- ML PREDICTION ---------- */
+    const mlRes = await fetch("http://localhost:8000/predict", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text: message }),
-    }
-  );
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: englishMessage })
+    });
 
-    const response = await result.json();
+    const mlData = await mlRes.json();
+    console.log("ML response:", mlData);
+
+    /*
+      Expected ML format:
+      {
+        predictions: [
+          { disease: "", confidence: number },
+          { disease: "", confidence: number },
+          { disease: "", confidence: number }
+        ],
+        inputs: ""
+      }
+    */
+
+    const predictions = mlData.predictions || [];
+    const top3 = predictions.slice(0, 3);
+    console.log("Top3 predictions:", top3);
+
+    /* ---------- SAVE HISTORY ---------- */
     const session = await auth();
     const userId = session?.user?.id;
 
-    console.log("ML response:", response);
-
-    const disease = response.disease;
-    const confidence = response.confidence;
-   
-
-    if (userId && disease && confidence !== undefined) {
-      const text = response.inputs;
-
+    if (userId && top3.length > 0) {
       await chatModel.updateOne(
         { userId },
         {
           $push: {
             messages: {
-              text,
-              disease,
-              confidence: parseFloat(confidence.toFixed(4)),
-            },
-          },
+              text: mlData.inputs,
+              predictions: top3,
+              createdAt: new Date()
+            }
+          }
         },
         { upsert: true }
       );
     }
-    const prompt = `
-You are a medical assistant chatbot.
 
-ML Prediction:
-Disease: ${disease}
-Confidence: ${confidence}%
+    /* ---------- PRECAUTIONS JSON ---------- */
+    let precautions = await getPrecautionsJSON(model, top3);
+    // Localize precautions JSON values to the same language as the user's original message
+    try {
+      const precTranslatePrompt = `Translate the following JSON VALUES into the SAME LANGUAGE as the ORIGINAL USER MESSAGE.\n\nRULES:\n- Output ONLY valid JSON.\n- Preserve keys and structure EXACTLY.\n- Translate only string values.\n\nORIGINAL USER MESSAGE:\n"""${message}"""\n\nJSON:\n\n${JSON.stringify(precautions)}`;
+      const precRes = await callModelWithRetry(model, precTranslatePrompt);
+      let precText = (precRes.response.text() || '').trim();
+      if (precText.startsWith('```')) {
+        precText = precText.replace(/^```(?:json)?/i, '').replace(/```\s*$/i, '').trim();
+      }
+      const localized = JSON.parse(precText);
+      if (localized && typeof localized === 'object' && 'diseases' in localized) {
+        precautions = localized;
+      }
+    } catch (e) {
+      console.warn('Precautions localization failed, using English.', e?.message || e);
+    }
+    console.log("Precautions JSON:", precautions);
+
+    /* ---------- USER FRIENDLY SUMMARY ---------- */
+    const summaryPrompt = `
+You are a medical assistant.
+
+Predicted conditions:
+${top3
+        .map(
+          (p, i) => `${i + 1}. ${p.disease} (${p.confidence}%)`
+        )
+        .join("\n")}
 
 Rules:
-- Write in short paragraphs.
-- Do NOT use markdown.
-- Do NOT use **, ###, --- or bullet symbols.
-- Use simple sentences.
-- Keep it friendly and professional.
-- End with a short medical disclaimer.
-
-Now respond to the user.
+- Short paragraphs
+- Simple language
+- No markdown
+- Friendly tone
+- End with a medical disclaimer
 `;
 
-    const resultGemini = await model.generateContent(prompt);
-    const reply = resultGemini.response.text();
+    const summaryResult = await callModelWithRetry(model, summaryPrompt);
+    let summaryReply = summaryResult.response.text();
+    summaryReply = await translateBackToUserLanguage(model, message, summaryReply);
+    console.log("Summary reply:", summaryReply);
 
+    /* ---------- LAST 10 PREDICTIONS REPORT ---------- */
+    let historyReport = null;
+    try {
+      const session2 = await auth();
+      const userId2 = session2?.user?.id;
+      if (userId2) {
+        const history10 = await chatModel.findOne(
+          { userId: userId2 },
+          { messages: { $slice: -10 } }
+        );
+        if (history10 && Array.isArray(history10.messages)) {
+          const flat = history10.messages
+            .flatMap(m => Array.isArray(m.predictions) ? m.predictions : [])
+            .map(p => ({ disease: p.disease, confidence: Number(p.confidence) || 0 }));
+          const agg = {};
+          for (const p of flat) {
+            const key = p.disease || "Unknown";
+            if (!agg[key]) agg[key] = { disease: key, count: 0, maxConfidence: 0 };
+            agg[key].count += 1;
+            if (p.confidence > agg[key].maxConfidence) agg[key].maxConfidence = p.confidence;
+          }
+          historyReport = Object.values(agg)
+            .sort((a, b) => b.count - a.count || b.maxConfidence - a.maxConfidence)
+            .slice(0, 10);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to build last-10 predictions report:", e?.message || e);
+    }
+
+    /* ---------- FINAL RESPONSE ---------- */
     return NextResponse.json({
-      reply,
-      disease,
-      confidence,
+      reply: summaryReply,
+      predictions: top3,
+      precautions,
+      historyReport
     });
+
   } catch (err) {
     console.error("CHAT API ERROR:", err);
+    const message = (err && err.message) ? err.message : "Unknown error";
     return NextResponse.json(
-      { reply: "Server error occurred." },
+      { reply: `Server error occurred: ${message}` },
       { status: 500 }
     );
   }
