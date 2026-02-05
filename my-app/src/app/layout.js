@@ -1,10 +1,10 @@
-import { Poppins, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { auth } from "../auth";
 import TransitionProvider from "./transition-provider";
 
-const poppins = Poppins({
+const inter = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"]
@@ -25,13 +25,13 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
-        className={`${poppins.variable} ${GeistMono.variable} antialiased`}
+        className={`${inter.variable} ${GeistMono.variable} antialiased`}
       >
         <header className="sticky top-0 z-50 animate-fade-in">
           {/* Outer wrapper (full width) with equal side spacing */}
           <div className="w-full px-4 md:px-6 mt-4">
             {/* Centered navbar div (fixed max-width, rounded) */}
-            <div className="mx-auto max-w-[1200px] h-16 glass rounded-full px-4 sm:px-6 flex items-center justify-between shadow-lg shadow-[#0fd4c3]/90">
+            <div className="mx-auto max-w-[1200px] h-16 glass rounded-full px-4 sm:px-6 flex items-center justify-between shadow-lg">
               {/* Left: Logo */}
               <Link href="/" className="flex items-center gap-3">
                 <span className="text-sm font-semibold tracking-wide text-[#0fd4c3]/90">AI-Symptom</span>

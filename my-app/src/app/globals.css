@@ -1,11 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #000000; /* pure black background */
+  /* Core palette */
+  --background: #0b1020; /* dark navy */
+  --background-2: #0e1426; /* charcoal navy */
   --foreground: #e6f4f1; /* soft off-white with slight cyan tint */
   --accent: #0f766e;     /* dark teal */
-  --accent-strong: #0ea5a4; /* cyan-teal */
+  --accent-strong: #06b6d4; /* cyan-teal */
   --accent-emerald: #10b981; /* emerald */
+  --mint: #99f6e4;
+  --amber-warn: #f59e0b;
+
+  /* Glass + glow */
+  --glass-bg: rgba(18, 26, 46, 0.45);
+  --glass-border: rgba(255,255,255,.08);
+  --glass-inner: rgba(255,255,255,.04);
+  --glow-cyan: 0 0 24px rgba(6, 182, 212, 0.28);
 }
 
 /* Generic animation utilities */
@@ -29,11 +39,19 @@
 
 
 .glass {
-  background: linear-gradient(180deg, rgba(10,17,17,.6), rgba(10,17,17,.4));
-  backdrop-filter: saturate(140%) blur(10px);
-  -webkit-backdrop-filter: saturate(140%) blur(10px);
-  border: 1px solid rgba(16,185,129,.12); /* faint emerald border */
-  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 20px rgba(15,118,110,.12), inset 0 1px 0 rgba(255,255,255,.04);
+  background: linear-gradient(180deg, var(--glass-bg), rgba(18,26,46,0.35));
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), var(--glow-cyan), inset 0 1px 0 var(--glass-inner);
+}
+
+.glass-strong {
+  background: linear-gradient(180deg, rgba(20,28,50,0.6), rgba(20,28,50,0.48));
+  backdrop-filter: saturate(160%) blur(16px);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 12px 40px rgba(0,0,0,.45), 0 0 28px rgba(99, 235, 255, 0.16), inset 0 1px 0 var(--glass-inner);
 }
 
 
@@ -60,9 +78,84 @@
 }
 
 body {
-  background: var(--background);
+  background: radial-gradient(1000px 600px at 10% 10%, #0f1b33 0%, transparent 50%),
+              radial-gradient(900px 540px at 90% 20%, #0b2731 0%, transparent 52%),
+              linear-gradient(180deg, var(--background), var(--background-2));
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Subtle noise overlay */
+.noise-overlay {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0.8  0 0 0 0 0.9  0 0 0 -.85 .35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)' opacity='.04'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+/* Subtle grid */
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  background-image: linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(60% 50% at 50% 40%, black, transparent 75%);
+  z-index: 0;
+}
+
+/* Hero ECG line (abstract) */
+.ecg-line {
+  position: absolute;
+  left: 0; right: 0; top: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(99, 235, 255, .8), transparent);
+  filter: drop-shadow(0 0 6px rgba(99, 235, 255, .55));
+  opacity: .75;
+}
+.ecg-line::after {
+  content: "";
+  position: absolute;
+  left: -20%;
+  width: 40%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(99, 235, 255, .9), transparent);
+  animation: ecg-scan 4.2s linear infinite;
+}
+@keyframes ecg-scan {
+  0% { transform: translateX(0) }
+  100% { transform: translateX(300%) }
+}
+
+/* Card helper */
+.card {
+  border-radius: 22px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 12px 30px rgba(0,0,0,.35), 0 0 18px rgba(6,182,212,.12);
+}
+
+/* Circular progress ring */
+.ring {
+  --size: 72px;
+  --track: rgba(255,255,255,.08);
+  --fill: #22d3ee; /* cyan */
+  width: var(--size); height: var(--size);
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.15), transparent 60%), var(--track);
+  position: relative;
+}
+.ring[data-p="0"] { background: var(--track) }
+.ring::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 999px;
+  background: conic-gradient(var(--fill) calc(var(--p,0) * 1%), transparent 0);
+  mask: radial-gradient(circle closest-side, transparent 65%, black 66%);
+}
+.ring-label {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 600; color: #c7f9ff;
 }
 
 /* Animated gradient for headings */
