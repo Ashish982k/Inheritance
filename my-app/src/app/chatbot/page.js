@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function ChatbotPage() {
   const [messages, setMessages] = useState([
@@ -11,6 +11,11 @@ export default function ChatbotPage() {
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages]);
 
   async function handleSend(e) {
     e.preventDefault();
@@ -73,33 +78,10 @@ export default function ChatbotPage() {
       {/* Hero: title + input */}
       <div className="relative z-10 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pt-4">
         <div className="relative overflow-hidden glass card rounded-[24px] px-6 py-8">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="ecg-line" />
-          </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-wide text-white">
             <span className="gradient-flow bg-clip-text text-transparent">AI Health Prediction System</span>
           </h1>
           <p className="mt-2 text-sm sm:text-base text-zinc-300">Early insights. Smarter care.</p>
-
-          <form onSubmit={handleSend} className="mt-6 flex items-center gap-3 glass-strong rounded-2xl p-2.5">
-            <div className="flex-1 flex items-center gap-2">
-              <span className="text-zinc-400">📝</span>
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Describe your symptoms..."
-                className="w-full bg-transparent outline-none text-zinc-100 placeholder:text-zinc-500 text-sm sm:text-base"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={busy}
-              className="btn-press rounded-xl bg-cyan-400/90 hover:bg-cyan-300 text-black px-4 py-2 text-sm font-semibold shadow-[0_0_20px_rgba(34,211,238,0.35)] disabled:opacity-60"
-            >
-              {busy ? "Sending..." : "Send"}
-            </button>
-            <div className="text-zinc-300/80" title="Voice input coming soon">🎙</div>
-          </form>
         </div>
       </div>
 
@@ -108,14 +90,15 @@ export default function ChatbotPage() {
         <div className="mt-6 glass card rounded-[24px] min-h-[50vh] flex flex-col">
           <div className="border-b border-white/10 p-4 text-sm font-medium text-zinc-200">Medical Chatbot</div>
 
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28">
+            <div className="space-y-3">
             {messages.map((m, i) => (
               <div
                 key={i}
                 className={
                   m.role === "user"
-                    ? "ml-auto max-w-[80%] rounded-2xl glass-strong px-4 py-3 text-zinc-100 animate-slide-up"
-                    : "mr-auto max-w-[80%] rounded-2xl glass px-4 py-3 text-zinc-100 animate-slide-up"
+                    ? "ml-auto max-w-[85%] rounded-2xl bg-gradient-to-br from-cyan-400/15 to-emerald-400/10 border border-white/10 px-4 py-3 text-zinc-50 shadow-[0_10px_30px_rgba(0,0,0,0.35)] animate-slide-up"
+                    : "mr-auto max-w-[85%] rounded-2xl glass px-4 py-3 text-zinc-100 animate-slide-up"
                 }
               >
                 {/* Assistant structured output */}
@@ -244,6 +227,42 @@ export default function ChatbotPage() {
                 )}
               </div>
             ))}
+            <div ref={bottomRef} />
+            </div>
+          </div>
+
+          <div className="sticky bottom-0 border-t border-white/10 p-3 sm:p-4 bg-[rgba(11,16,32,0.65)] backdrop-blur-xl">
+            <form onSubmit={handleSend} className="flex items-end gap-3">
+              <div className="flex-1 glass-strong rounded-2xl px-3 py-2">
+                <div className="flex items-start gap-2">
+                  <span className="mt-1 text-zinc-400">📝</span>
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend(e);
+                      }
+                    }}
+                    placeholder="Describe your symptoms..."
+                    rows={1}
+                    className="w-full resize-none bg-transparent outline-none text-zinc-100 placeholder:text-zinc-500 text-sm sm:text-base leading-relaxed"
+                  />
+                </div>
+                <div className="mt-1 flex items-center justify-between">
+                  <div className="text-xs text-zinc-400">Enter to send · Shift+Enter for new line</div>
+                  <div className="text-zinc-300/80" title="Voice input coming soon">🎙</div>
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={busy || !input.trim()}
+                className="btn-press h-[44px] rounded-2xl bg-cyan-400/90 hover:bg-cyan-300 text-black px-5 text-sm font-semibold shadow-[0_0_20px_rgba(34,211,238,0.35)] disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {busy ? "Sending..." : "Send"}
+              </button>
+            </form>
           </div>
 
         </div>

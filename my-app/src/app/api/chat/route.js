@@ -99,8 +99,6 @@ Return a JSON object following the exact schema above, populated with appropriat
 -------------------------------------------------- */
 export async function POST(req) {
   try {
-    await connectDB();
-
     const { message } = await req.json();
     console.log("User message:", message);
 
@@ -165,6 +163,15 @@ User message:
       if (!userId) {
         return NextResponse.json({
           reply: "No medical history found."
+        });
+      }
+
+      try {
+        await connectDB();
+      } catch (e) {
+        console.error("MongoDB connection failed (history request):", e);
+        return NextResponse.json({
+          reply: "Medical history is temporarily unavailable."
         });
       }
 
@@ -248,19 +255,24 @@ If not available, clearly say so.
     const userId = session?.user?.id;
 
     if (userId && top3.length > 0) {
-      await chatModel.updateOne(
-        { userId },
-        {
-          $push: {
-            messages: {
-              text: mlData.inputs,
-              predictions: top3,
-              createdAt: new Date()
+      try {
+        await connectDB();
+        await chatModel.updateOne(
+          { userId },
+          {
+            $push: {
+              messages: {
+                text: mlData.inputs,
+                predictions: top3,
+                createdAt: new Date()
+              }
             }
-          }
-        },
-        { upsert: true }
-      );
+          },
+          { upsert: true }
+        );
+      } catch (e) {
+        console.error("MongoDB write failed (save history):", e);
+      }
     }
 
     /* ---------- PRECAUTIONS JSON ---------- */
@@ -309,6 +321,7 @@ Rules:
     /* ---------- LAST 10 PREDICTIONS REPORT ---------- */
     let historyReport = null;
     try {
+      await connectDB();
       const session2 = await auth();
       const userId2 = session2?.user?.id;
       if (userId2) {
