@@ -28,36 +28,38 @@ export default async function RootLayout({ children }) {
         className={`${poppins.variable} ${GeistMono.variable} antialiased`}
       >
         <header className="sticky top-0 z-50 animate-fade-in">
-          {/* Outer wrapper (full width) with equal side spacing */}
+          {/* Outer wrapper with side padding to keep pill centered and not full width */}
           <div className="w-full px-4 md:px-6 mt-4">
-            {/* Centered navbar div (fixed max-width, rounded) */}
-            <div className="mx-auto max-w-[1200px] h-16 glass rounded-full px-4 sm:px-6 flex items-center justify-between shadow-lg shadow-[#0fd4c3]/90">
-              {/* Left: Logo */}
-              <Link href="/" className="flex items-center gap-3">
-                <span className="text-sm font-semibold tracking-wide text-[#0fd4c3]/90">AI-Symptom</span>
-              </Link>
-              {/* Right: Menu */}
-              <nav className="flex items-center gap-4 sm:gap-6 text-sm sm:text-base font-semibold">
-                <Link href="/" className="text-[#0fd4c3]/90 hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Home</Link>
-                <Link href="/chatbot" className="text-[#0fd4c3]/90 hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Chatbot</Link>
-                <Link href="/contact" className="text-[#0fd4c3]/90 hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Contact</Link>
-                <Link href="/login" className="text-[#0fd4c3]/90 hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">{session?.user ? (
-                  <div className="flex items-center gap-3 max-w-[16rem]">
-                    {session.user.image ? (
-                      <img
-                        src={session.user.image}
-                        alt={session.user.name ?? "User"}
-                        className="h-8 w-8 rounded-full border border-white/20 object-cover"
-                      />
-                    ) : (
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[#0fd4c3]/90">
-                        {(session.user.name?.[0] ?? "U").toUpperCase()}
-                      </span>
-                    )}
-                    <span className="text-[#0fd4c3]/90 truncate">{session.user.name ?? session.user.email ?? "Account"}</span>
-                  </div>
-                ) : "Login"}</Link>
-              </nav>
+            {/* Centered pill navbar */}
+            <div className="mx-auto max-w-[1200px] h-16 glass rounded-full px-4 sm:px-6 flex items-center justify-between shadow-[0_0_24px_rgba(15,118,110,0.18)]">
+            <Link href="/" className="flex items-center gap-3">
+              {/* Image */}
+              <span className="text-sm font-semibold tracking-wide text-[#0bbaac]">AI-Symptom</span>
+            </Link>
+            <nav className="flex items-center gap-6 text-base font-semibold">
+              <Link href="/" className="text-[#0bbaac] hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Home</Link>
+              <Link href="/chatbot" className="text-[#0bbaac] hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Chatbot</Link>
+              <Link href="/contact" className="text-[#0bbaac] hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Contact</Link>
+              
+                <Link href="/login" className="text-[#0bbaac] hover:text-white transition-colors">{session?.user ? (
+                <div className="flex items-center gap-3 max-w-[16rem]">
+                  {session.user.image ? (
+                   
+                    <img
+                      src={session.user.image}
+                      alt={session.user.name ?? "User"}
+                      className="h-8 w-8 rounded-full border border-white/20 object-cover"
+                    />
+                  ) : (
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[#0bbaac]">
+                      {(session.user.name?.[0] ?? "U").toUpperCase()}
+                    </span>
+                  )}
+                  <span className="text-[#0bbaac] truncate">{session.user.name ?? session.user.email ?? "Account"}</span>
+                </div>
+              ) : "Login"}</Link>
+              
+            </nav>
             </div>
           </div>
         </header>

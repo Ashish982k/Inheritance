@@ -59,19 +59,19 @@ export default function ChatbotPage() {
   return (
     <section className="flex h-[calc(100dvh-4rem)] w-full flex-col bg-black">
       <div className="w-full h-full flex-1 p-4 sm:p-6">
-        <div className="flex h-full flex-col rounded-xl border border-white/10 bg-zinc-900/40">
-          <div className="border-b border-white/10 p-3 text-sm font-medium text-zinc-200">
-            Medical Chatbot
+        <div className="mx-auto h-full w-full max-w-5xl glass rounded-3xl flex flex-col shadow-[0_0_28px_rgba(15,118,110,0.12)]">
+          <div className="border-b border-white/10 p-4 text-sm font-semibold text-zinc-200">
+            <span className="bg-clip-text text-transparent gradient-flow">Medical AI Assistant</span>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
             {messages.map((m, i) => (
               <div
                 key={i}
                 className={
                   m.role === "user"
-                    ? "ml-auto max-w-[80%] rounded-lg bg-zinc-800 px-4 py-2 text-zinc-100"
-                    : "mr-auto max-w-[80%] rounded-lg bg-zinc-700 px-4 py-2 text-zinc-100"
+                    ? "ml-auto max-w-[80%] rounded-3xl glass px-4 py-3 text-zinc-100 ring-1 ring-emerald-400/20"
+                    : "mr-auto max-w-[80%] rounded-3xl glass px-4 py-3 text-zinc-100"
                 }
               >
                 {/* Assistant structured output */}
@@ -89,19 +89,21 @@ export default function ChatbotPage() {
 
           <form
             onSubmit={handleSend}
-            className="flex items-center gap-2 border-t border-white/10 p-3"
+            className="flex items-center gap-3 border-t border-white/10 p-3 sticky bottom-0 bg-transparent"
           >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your symptoms..."
-              className="flex-1 rounded-md border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:ring-2 focus:ring-white/20"
-            />
+            <div className="flex-1 glass rounded-3xl p-2.5 focus-within:ring-2 focus-within:ring-emerald-400/40">
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Describe your symptoms..."
+                className="w-full bg-transparent outline-none text-zinc-100 placeholder:text-zinc-500 text-base"
+              />
+            </div>
 
             <button
               type="submit"
               disabled={busy}
-              className="rounded-md bg-[#0fd4c3]/90 px-4 py-2 text-sm font-medium text-black hover:bg-[#0fd4c3]/90 disabled:opacity-50"
+              className="btn-press rounded-full bg-emerald-400/90 hover:bg-emerald-400 text-black px-5 py-2.5 text-sm font-semibold shadow-[0_0_24px_rgba(52,211,153,0.35)] disabled:opacity-50"
             >
               {busy ? "Sending..." : "Send"}
             </button>

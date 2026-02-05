@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #000000; /* pure black background */
-  --foreground: #e6f4f1; /* soft off-white with slight cyan tint */
-  --accent: #0f766e;     /* dark teal */
+  /* Premium dark medical theme */
+  --background: #0b0f0f; /* near-black */
+  --foreground: #e6f4f1; /* soft off-white */
+  --accent: #0f766e;      /* deep teal */
   --accent-strong: #0ea5a4; /* cyan-teal */
-  --accent-emerald: #10b981; /* emerald */
+  --accent-emerald: #064e3b; /* dark emerald */
 }
 
 /* Generic animation utilities */
@@ -27,16 +28,16 @@
   to { opacity: 1; transform: translateY(0) }
 }
 
-
+/* Subtle glassmorphism surface */
 .glass {
-  background: linear-gradient(180deg, rgba(10,17,17,.6), rgba(10,17,17,.4));
-  backdrop-filter: saturate(140%) blur(10px);
-  -webkit-backdrop-filter: saturate(140%) blur(10px);
-  border: 1px solid rgba(16,185,129,.12); /* faint emerald border */
-  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 20px rgba(15,118,110,.12), inset 0 1px 0 rgba(255,255,255,.04);
+  background: linear-gradient(180deg, rgba(12,16,16,.60), rgba(12,16,16,.42));
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+  border: 1px solid rgba(14,165,164,.14); /* faint teal border */
+  box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 24px rgba(15,118,110,.12), inset 0 1px 0 rgba(255,255,255,.04);
 }
 
-
+/* Interactive helpers */
 .hover-lift {
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
@@ -54,7 +55,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #000000; /* pure black in dark mode as well */
+    --background: #0b0f0f;
     --foreground: #e6f4f1;
   }
 }
@@ -67,7 +68,7 @@ body {
 
 /* Animated gradient for headings */
 .gradient-flow {
-  background-image: linear-gradient(90deg, var(--accent-strong), var(--accent-emerald), var(--accent), var(--accent-strong));
+  background-image: linear-gradient(90deg, var(--accent-strong), var(--accent), var(--accent-emerald), var(--accent-strong));
   background-size: 200% 100%;
   animation: gradient-move 6s linear infinite;
 }
