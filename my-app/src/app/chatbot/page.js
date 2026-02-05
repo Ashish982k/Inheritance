@@ -11,8 +11,11 @@ export default function ChatbotPage() {
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(true);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   async function downscaleImage(file, { maxSize = 768, quality = 0.8 } = {}) {
     try {
@@ -65,13 +68,40 @@ export default function ChatbotPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  async function handleSend(e) {
-    e.preventDefault();
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceSupported(false);
+      return;
+    }
 
-    const text = input.trim();
-    if (!text || busy) return;
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.lang = "en-US";
 
-    setMessages((cur) => [...cur, { role: "user", content: text }]);
+    rec.onstart = () => setListening(true);
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+
+    recognitionRef.current = rec;
+    return () => {
+      try {
+        rec.onstart = null;
+        rec.onend = null;
+        rec.onerror = null;
+        rec.onresult = null;
+        rec.stop();
+      } catch {}
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  async function sendText(text) {
+    const trimmed = (text || "").trim();
+    if (!trimmed || busy) return;
+
+    setMessages((cur) => [...cur, { role: "user", content: trimmed }]);
     setInput("");
     setBusy(true);
 
@@ -79,7 +109,7 @@ export default function ChatbotPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: trimmed }),
       });
 
       if (!res.ok) throw new Error("API error");
@@ -115,6 +145,53 @@ export default function ChatbotPage() {
     }
 
     setBusy(false);
+  }
+
+  async function handleSend(e) {
+    e.preventDefault();
+    await sendText(input);
+  }
+
+  async function toggleVoice() {
+    if (!voiceSupported || busy) return;
+    const rec = recognitionRef.current;
+    if (!rec) return;
+
+    if (listening) {
+      try {
+        rec.stop();
+      } catch {}
+      return;
+    }
+
+    let finalText = "";
+    rec.onresult = (event) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0]?.transcript || "";
+        if (event.results[i].isFinal) finalText += transcript;
+        else interim += transcript;
+      }
+      const combined = (finalText + interim).trim();
+      if (combined) setInput(combined);
+    };
+
+    rec.onend = async () => {
+      setListening(false);
+      const text = (finalText || input || "").trim();
+      if (text) {
+        await sendText(text);
+      }
+    };
+
+    try {
+      rec.start();
+    } catch (e) {
+      setMessages((cur) => [
+        ...cur,
+        { role: "assistant", content: "Voice input failed to start. Please try again." },
+      ]);
+    }
   }
 
   async function handleImageUpload(file) {
@@ -351,7 +428,15 @@ export default function ChatbotPage() {
                 </div>
                 <div className="mt-1 flex items-center justify-between">
                   <div className="text-xs text-zinc-400">Enter to send · Shift+Enter for new line</div>
-                  <div className="text-zinc-300/80" title="Voice input coming soon">🎙</div>
+                  <button
+                    type="button"
+                    onClick={toggleVoice}
+                    disabled={busy || !voiceSupported}
+                    className="text-zinc-300/80 disabled:opacity-50"
+                    title={voiceSupported ? (listening ? "Stop voice input" : "Voice input") : "Voice input not supported"}
+                  >
+                    {listening ? "⏹" : "🎙"}
+                  </button>
                 </div>
               </div>
               <input
