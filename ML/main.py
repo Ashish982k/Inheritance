@@ -92,5 +92,10 @@ def predict(data: Input):
         "top3": [
             {"disease": d, "confidence": round(float(p) * 100, 2)}
             for d, p in top3
-        ]
+        ],
+        "inputs": data.text,
+        "predictions": [
+            {"disease": d, "confidence": round(float(p) * 100, 2)}
+            for d, p in top3
+        ],
     }
