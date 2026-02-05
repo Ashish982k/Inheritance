@@ -40,6 +40,52 @@ async function callModelWithRetry(model, input, { tries = 3, baseDelayMs = 500 }
   throw lastErr;
 }
 
+function normalizePredictions(list) {
+  const arr = Array.isArray(list) ? list : [];
+  return arr
+    .filter(Boolean)
+    .map((p) => ({
+      disease: typeof p?.disease === "string" ? p.disease.trim() : "",
+      confidence: Math.max(0, Math.min(100, Number(p?.confidence) || 0)),
+    }))
+    .filter((p) => p.disease.length > 0)
+    .slice(0, 3);
+}
+
+async function getGeminiPredictionsJSON(model, englishMessage) {
+  const systemPrompt = `
+You are a medical triage assistant.
+
+IMPORTANT:
+- Respond ONLY in valid JSON (no markdown, no extra text).
+- Output confidence as a number from 0 to 100.
+- Return EXACTLY 3 predictions.
+
+JSON SCHEMA:
+{
+  "predictions": [
+    { "disease": string, "confidence": number },
+    { "disease": string, "confidence": number },
+    { "disease": string, "confidence": number }
+  ]
+}
+`;
+
+  const userPrompt = `
+User symptoms (English):
+"""${englishMessage}"""
+
+Return the top 3 most likely diseases with confidence.
+`;
+
+  const result = await callModelWithRetry(model, `${systemPrompt}\n\n${userPrompt}`);
+  let text = (result.response.text() || "").trim();
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?/i, "").replace(/```\s*$/i, "").trim();
+  }
+  return JSON.parse(text);
+}
+
 /* --------------------------------------------------
    Gemini helper: Precautions JSON (NEW SCHEMA)
 -------------------------------------------------- */
@@ -71,17 +117,24 @@ JSON SCHEMA:
 
 OUTPUT INSTRUCTIONS:
 - Include a concise, general-purpose medical disclaimer in "disclaimer".
-- In "diseases", include 3–5 relevant conditions based on the user's symptoms/predictions.
+- In "diseases", include EXACTLY the TOP 3 predicted diseases provided.
+- The diseases array MUST contain exactly 3 objects (or fewer only if fewer predictions are provided).
+- Each disease object's "name" MUST match one of the provided prediction disease names exactly.
+- Do NOT include any additional diseases besides the provided prediction disease names.
 - Each disease must list 3–6 common symptoms and 3–6 practical precautions.
 - Use short, safety-focused sentences.
 - Do not include medication names.
 `;
 
+  const list = Array.isArray(predictions) ? predictions.slice(0, 3) : [];
+  const allowedNames = list.map((p) => p?.disease).filter(Boolean);
   const userPrompt = `
-User's top predictions (name and confidence):
-${JSON.stringify(predictions, null, 2)}
+Top predicted diseases (use ONLY these disease names):
+${JSON.stringify(list, null, 2)}
 
-Return a JSON object following the exact schema above, populated with appropriate conditions and precautions that are relevant to the predictions.
+Return a JSON object following the exact schema above.
+The diseases array MUST contain exactly ${allowedNames.length} object(s) and each object's name MUST be one of:
+${allowedNames.map((n) => `- ${n}`).join("\n")}
 `;
 
   const prompt = `${systemPrompt}\n\n${userPrompt}`;
@@ -246,9 +299,36 @@ If not available, clearly say so.
       }
     */
 
-    const predictions = mlData.predictions || [];
-    const top3 = predictions.slice(0, 3);
-    console.log("Top3 predictions:", top3);
+    // Normalize ML response shape.
+    // Supported formats:
+    // - { predictions: [{ disease, confidence }, ...] }
+    // - { top3: [{ disease, confidence }, ...], disease, confidence }
+    // - { disease, confidence, top3 }
+    const mlPredictionsRaw =
+      (Array.isArray(mlData?.predictions) && mlData.predictions) ||
+      (Array.isArray(mlData?.top3) && mlData.top3) ||
+      (mlData?.disease ? [{ disease: mlData.disease, confidence: mlData.confidence }] : []);
+
+    const mlTop3 = normalizePredictions(mlPredictionsRaw);
+    console.log("ML Top3 predictions:", mlTop3);
+
+    /* ---------- GEMINI PREDICTION (JSON) ---------- */
+    let geminiTop3 = [];
+    try {
+      const geminiPred = await getGeminiPredictionsJSON(model, englishMessage);
+      geminiTop3 = normalizePredictions(geminiPred?.predictions);
+    } catch (e) {
+      console.warn("Gemini predictions failed; falling back to ML.", e?.message || e);
+      geminiTop3 = [];
+    }
+    console.log("Gemini Top3 predictions:", geminiTop3);
+
+    const mlTop1 = mlTop3?.[0]?.confidence ?? 0;
+    const gemTop1 = geminiTop3?.[0]?.confidence ?? 0;
+
+    const chosenSource = gemTop1 > mlTop1 ? "gemini" : "ml";
+    const top3 = (chosenSource === "gemini" && geminiTop3.length > 0) ? geminiTop3 : mlTop3;
+    console.log("Chosen source:", chosenSource, "Top3:", top3);
 
     /* ---------- SAVE HISTORY ---------- */
     const session = await auth();
@@ -262,7 +342,7 @@ If not available, clearly say so.
           {
             $push: {
               messages: {
-                text: mlData.inputs,
+                text: englishMessage,
                 predictions: top3,
                 createdAt: new Date()
               }
@@ -276,7 +356,7 @@ If not available, clearly say so.
     }
 
     /* ---------- PRECAUTIONS JSON ---------- */
-    let precautions = await getPrecautionsJSON(model, top3);
+    let precautions = top3.length > 0 ? await getPrecautionsJSON(model, top3) : null;
     // Localize precautions JSON values to the same language as the user's original message
     try {
       const precTranslatePrompt = `Translate the following JSON VALUES into the SAME LANGUAGE as the ORIGINAL USER MESSAGE.\n\nRULES:\n- Output ONLY valid JSON.\n- Preserve keys and structure EXACTLY.\n- Translate only string values.\n\nORIGINAL USER MESSAGE:\n"""${message}"""\n\nJSON:\n\n${JSON.stringify(precautions)}`;
@@ -298,12 +378,15 @@ If not available, clearly say so.
     const summaryPrompt = `
 You are a medical assistant.
 
-Predicted conditions:
+The user's symptoms text (English):
+"""${englishMessage}"""
+
+Predicted conditions (name and confidence):
 ${top3
-        .map(
-          (p, i) => `${i + 1}. ${p.disease} (${p.confidence}%)`
-        )
-        .join("\n")}
+      .map((p, i) => `${i + 1}. ${p.disease} (${Math.round(Number(p.confidence) || 0)}%)`)
+      .join("\n")}
+
+Write a helpful response that is consistent with the predicted conditions above.
 
 Rules:
 - Short paragraphs
@@ -354,7 +437,8 @@ Rules:
       reply: summaryReply,
       predictions: top3,
       precautions,
-      historyReport
+      historyReport,
+      source: chosenSource
     });
 
   } catch (err) {
