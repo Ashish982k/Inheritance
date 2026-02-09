@@ -1,18 +1,14 @@
-import React from 'react'
-
-const box = ({icon, text}) => {
+const Box = ({ icon, text }) => {
   return (
-    
-        <>
-        <button
-          type="submit"
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-white/15 bg-black/30 px-4 py-2 text-sm font-medium text-zinc-100 hover:bg-white/10"
-        >
-          {icon}
-          {text}
-        </button></>
-    
-  )
-}
+    <button
+      type="submit"
+      className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-100 hover:bg-white/10 hover:border-accent-bright/30 transition-all btn-press"
+      aria-label={text}
+    >
+      {icon}
+      <span>{text}</span>
+    </button>
+  );
+};
 
-export default box
+export default Box;

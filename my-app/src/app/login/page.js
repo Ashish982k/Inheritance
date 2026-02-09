@@ -4,11 +4,37 @@ import { auth, signIn, signOut } from "../../auth";
 export default async function LoginPage() {
   const session = await auth();
   return (
-    <section className="flex min-h-[calc(100dvh-4rem)] w-full items-center justify-center bg-black">
-      <div className="w-full max-w-md rounded-xl border border-white/10 bg-zinc-900/40 p-6 shadow">
-        <h1 className="mb-4 text-xl font-semibold text-zinc-100 text-center">
-          {session ? "Account" : "Login"}
+    <section className="flex min-h-[calc(100dvh-6rem)] w-full items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md glass rounded-3xl p-8 shadow-lg animate-slide-up">
+        <h1 className="mb-6 text-2xl font-semibold text-center">
+          <span className="gradient-flow bg-clip-text text-transparent">
+            {session ? "Account" : "Welcome Back"}
+          </span>
         </h1>
+
+        {session && session.user && (
+          <div className="mb-6 flex items-center justify-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+            {session.user.image ? (
+              <img
+                src={session.user.image}
+                alt={session.user.name ?? "User"}
+                className="h-12 w-12 rounded-full border-2 border-accent-bright/40 object-cover"
+              />
+            ) : (
+              <div className="h-12 w-12 rounded-full bg-accent-bright/20 border-2 border-accent-bright/40 flex items-center justify-center text-accent-bright font-bold text-lg">
+                {(session.user.name?.[0] ?? "U").toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-zinc-100">
+                {session.user.name ?? "User"}
+              </p>
+              <p className="text-xs text-zinc-400">
+                {session.user.email ?? ""}
+              </p>
+            </div>
+          </div>
+        )}
 
         {session ? (
           <form
@@ -24,16 +50,16 @@ export default async function LoginPage() {
                   viewBox="0 0 24 24"
                   className="h-4 w-4"
                   fill="currentColor"
-                  aria-hidden
+                  aria-hidden="true"
                 >
                   <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zM20 3H10c-1.1 0-2 .9-2 2v4h2V5h10v14H10v-4H8v4c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
                 </svg>
               }
-              text="Sign out"
+              text="Sign Out"
             />
           </form>
         ) : (
-          <>
+          <div className="space-y-3">
             <form
               action={async () => {
                 "use server";
@@ -45,7 +71,8 @@ export default async function LoginPage() {
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 48 48"
-                    className="h-4 w-4"
+                    className="h-5 w-5"
+                    aria-hidden="true"
                   >
                     <path
                       fill="#FFC107"
@@ -80,9 +107,9 @@ export default async function LoginPage() {
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
-                    className="h-4 w-4"
+                    className="h-5 w-5"
                     fill="currentColor"
-                    aria-hidden
+                    aria-hidden="true"
                   >
                     <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.757-1.333-1.757-1.089-.744.084-.729.084-.729 1.205.084 1.84 1.236 1.84 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.469-2.381 1.236-3.221-.123-.303-.536-1.523.117-3.176 0 0 1.008-.322 3.301 1.23a11.51 11.51 0 0 1 3.003-.404c1.018.005 2.042.138 3.003.404 2.292-1.552 3.298-1.23 3.298-1.23.655 1.653.242 2.873.12 3.176.77.84 1.235 1.911 1.235 3.221 0 4.61-2.807 5.625-5.48 5.921.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12z" />
                   </svg>
@@ -102,9 +129,9 @@ export default async function LoginPage() {
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
-                    className="h-4 w-4"
+                    className="h-5 w-5"
                     fill="#1877F2"
-                    aria-hidden
+                    aria-hidden="true"
                   >
                     <path d="M24 12.073c0-6.627-5.373-12-12-12S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953h-1.513c-1.49 0-1.953.926-1.953 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.063 24 12.073z" />
                   </svg>
@@ -112,10 +139,10 @@ export default async function LoginPage() {
                 text="Continue with Facebook"
               />
             </form>
-          </>
+          </div>
         )}
 
-        <p className="mt-3 text-center text-xs text-zinc-500">
+        <p className="mt-6 text-center text-xs text-zinc-500 leading-relaxed">
           By continuing you agree to our Terms and Privacy Policy.
         </p>
       </div>

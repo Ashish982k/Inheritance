@@ -27,22 +27,45 @@ export default async function RootLayout({ children }) {
       <body
         className={`${inter.variable} ${GeistMono.variable} antialiased`}
       >
-        <header className="sticky top-0 z-50 animate-fade-in">
+        <header className="sticky top-0 z-50 animate-fade-in py-4">
           {/* Outer wrapper (full width) with equal side spacing */}
-          <div className="w-full px-4 md:px-6 mt-4">
+          <div className="w-full px-4 md:px-6">
             {/* Centered navbar div (fixed max-width, rounded) */}
             <div className="mx-auto max-w-[1200px] h-16 glass rounded-full px-4 sm:px-6 flex items-center justify-between shadow-lg">
               {/* Left: Logo */}
               <Link href="/" className="flex items-center gap-3">
-                <span className="text-sm font-semibold tracking-wide text-[#0fd4c3]/90">AI-Symptom</span>
+                <span className="text-sm font-semibold tracking-wide text-accent-bright/90 hover:text-accent-bright transition-colors">AI-Symptom</span>
               </Link>
               {/* Right: Menu */}
               <nav className="flex items-center gap-4 sm:gap-6 text-sm sm:text-base font-semibold">
-                <Link href="/" className="text-[#0fd4c3]/90 hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Home</Link>
-                <Link href="/chatbot" className="text-[#0fd4c3]/90 hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Chatbot</Link>
-                <Link href="/contact" className="text-[#0fd4c3]/90 hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">Contact</Link>
-                <Link href="/login" className="text-[#0fd4c3]/90 hover:text-white hover:underline underline-offset-4 decoration-emerald-400/60 transition-colors hover-lift">{session?.user ? (
-                  <div className="flex items-center gap-3 max-w-[16rem]">
+                <Link
+                  href="/"
+                  className="text-accent-bright/90 hover:text-white hover:underline underline-offset-4 decoration-accent-emerald/60 transition-colors hover-lift"
+                  aria-label="Home page"
+                >
+                  Home
+                </Link>
+                <Link
+                  href="/chatbot"
+                  className="text-accent-bright/90 hover:text-white hover:underline underline-offset-4 decoration-accent-emerald/60 transition-colors hover-lift"
+                  aria-label="Chatbot page"
+                >
+                  Chatbot
+                </Link>
+                <Link
+                  href="/contact"
+                  className="text-accent-bright/90 hover:text-white hover:underline underline-offset-4 decoration-accent-emerald/60 transition-colors hover-lift"
+                  aria-label="Contact page"
+                >
+                  Contact
+                </Link>
+                <Link
+                  href="/login"
+                  className="text-accent-bright/90 hover:text-white hover:underline underline-offset-4 decoration-accent-emerald/60 transition-colors hover-lift"
+                  aria-label={session?.user ? "User account" : "Login page"}
+                >
+                  {session?.user ? (
+                  <div className="flex items-center gap-2 max-w-[12rem] lg:max-w-[16rem]">
                     {session.user.image ? (
                       <img
                         src={session.user.image}
@@ -50,18 +73,18 @@ export default async function RootLayout({ children }) {
                         className="h-8 w-8 rounded-full border border-white/20 object-cover"
                       />
                     ) : (
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[#0fd4c3]/90">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-accent-bright/90 text-sm font-semibold">
                         {(session.user.name?.[0] ?? "U").toUpperCase()}
                       </span>
                     )}
-                    <span className="text-[#0fd4c3]/90 truncate">{session.user.name ?? session.user.email ?? "Account"}</span>
+                    <span className="text-accent-bright/90 truncate text-sm">{session.user.name ?? session.user.email ?? "Account"}</span>
                   </div>
                 ) : "Login"}</Link>
               </nav>
             </div>
           </div>
         </header>
-        <main className="min-h-[calc(100dvh-4rem)] w-full px-4 py-8">
+        <main className="min-h-[calc(100dvh-6rem)] w-full">
           <TransitionProvider>
             {children}
           </TransitionProvider>

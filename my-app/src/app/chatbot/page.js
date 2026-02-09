@@ -329,7 +329,7 @@ export default function ChatbotPage() {
   }
 
   return (
-    <section className="relative min-h-[calc(100dvh-4rem)] w-full flex">
+    <section className="relative min-h-[calc(100dvh-6rem)] w-full flex">
       {/* Ambient background layers */}
       <div className="noise-overlay" />
       <div className="bg-grid" />
@@ -337,16 +337,17 @@ export default function ChatbotPage() {
       {/* Left Sidebar */}
       <div
         className={`relative z-20 ${
-          sidebarOpen ? "w-64 lg:w-72" : "w-0"
-        } transition-all duration-300 overflow-hidden border-r border-white/10`}
+          sidebarOpen ? "w-64 lg:w-80" : "w-0"
+        } transition-all duration-300 ease-in-out overflow-hidden border-r border-white/10`}
       >
-        <div className="h-full glass backdrop-blur-xl flex flex-col">
+        <div className="h-full glass backdrop-blur-xl flex flex-col min-w-[16rem] lg:min-w-[20rem]">
           {/* Sidebar Header */}
           <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <h2 className="text-zinc-100 font-semibold">Chat History</h2>
+            <h2 className="text-zinc-100 font-semibold text-sm">Chat History</h2>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-zinc-400 hover:text-zinc-100"
+              className="md:hidden text-zinc-400 hover:text-zinc-100 transition-colors p-1"
+              aria-label="Close sidebar"
             >
               ✕
             </button>
@@ -356,7 +357,8 @@ export default function ChatbotPage() {
           <div className="p-3">
             <button
               onClick={handleNewChat}
-              className="w-full rounded-xl bg-cyan-400/20 hover:bg-cyan-400/30 border border-cyan-400/30 text-cyan-100 px-4 py-2.5 text-sm font-medium transition-all"
+              className="w-full rounded-xl bg-accent-bright/20 hover:bg-accent-bright/30 border border-accent-bright/30 text-accent-bright px-4 py-2.5 text-sm font-medium transition-all btn-press"
+              aria-label="Start new chat"
             >
               ➕ New Chat
             </button>
@@ -365,7 +367,10 @@ export default function ChatbotPage() {
           {/* History List */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {loadingHistory ? (
-              <div className="text-zinc-400 text-xs text-center py-4">Loading history...</div>
+              <div className="text-zinc-400 text-xs text-center py-4 animate-pulse">
+                <div className="inline-block h-4 w-4 border-2 border-accent-bright border-t-transparent rounded-full animate-spin mr-2"></div>
+                Loading history...
+              </div>
             ) : chatHistory.length === 0 ? (
               <div className="text-zinc-500 text-xs text-center py-4">No chat history yet</div>
             ) : (
@@ -383,11 +388,12 @@ export default function ChatbotPage() {
                   <button
                     key={index}
                     onClick={() => handleSelectChat(index)}
-                    className={`w-full text-left rounded-xl px-3 py-2.5 transition-all ${
+                    className={`w-full text-left rounded-xl px-3 py-2.5 transition-all btn-press ${
                       isSelected
-                        ? "bg-cyan-400/20 border border-cyan-400/40"
+                        ? "bg-accent-bright/20 border border-accent-bright/40"
                         : "bg-white/5 hover:bg-white/10 border border-transparent"
                     }`}
+                    aria-label={`View chat about ${disease}`}
                   >
                     <div className="text-xs text-zinc-100 font-medium truncate">{disease}</div>
                     <div className="text-xs text-zinc-400 mt-1 truncate">
@@ -405,7 +411,7 @@ export default function ChatbotPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="relative z-10 flex-1 flex flex-col">
+      <div className="relative z-10 flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="px-4 sm:px-6 pt-4">
           <div className="relative overflow-hidden glass card rounded-[24px] px-6 py-6">
@@ -634,10 +640,10 @@ export default function ChatbotPage() {
             </div>
 
             <div className="sticky bottom-0 border-t border-white/10 p-3 sm:p-4 bg-[rgba(11,16,32,0.65)] backdrop-blur-xl">
-              <form onSubmit={handleSend} className="flex items-end gap-3">
-                <div className="flex-1 glass-strong rounded-2xl px-3 py-2">
+              <form onSubmit={handleSend} className="flex flex-wrap sm:flex-nowrap items-end gap-2 sm:gap-3">
+                <div className="flex-1 min-w-full sm:min-w-0 glass-strong rounded-2xl px-3 py-2">
                   <div className="flex items-start gap-2">
-                    <span className="mt-1 text-zinc-400">📝</span>
+                    <span className="mt-1 text-zinc-400" aria-hidden="true">📝</span>
                     <textarea
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
@@ -650,6 +656,7 @@ export default function ChatbotPage() {
                       placeholder="Describe your symptoms..."
                       rows={1}
                       className="w-full resize-none bg-transparent outline-none text-zinc-100 placeholder:text-zinc-500 text-sm sm:text-base leading-relaxed"
+                      aria-label="Symptom description input"
                     />
                   </div>
                   <div className="mt-1 flex items-center justify-between">
@@ -660,12 +667,12 @@ export default function ChatbotPage() {
                       type="button"
                       onClick={toggleVoice}
                       disabled={busy || !voiceSupported}
-                      className="text-zinc-300/80 disabled:opacity-50"
-                      title={
+                      className="text-zinc-300/80 disabled:opacity-50 hover:text-accent-bright transition-colors p-1"
+                      aria-label={
                         voiceSupported
                           ? listening
                             ? "Stop voice input"
-                            : "Voice input"
+                            : "Start voice input"
                           : "Voice input not supported"
                       }
                     >
@@ -673,33 +680,38 @@ export default function ChatbotPage() {
                     </button>
                   </div>
                 </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = "";
-                    handleImageUpload(file);
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="btn-press h-[44px] rounded-2xl bg-white/10 hover:bg-white/15 text-zinc-100 px-4 text-sm font-semibold border border-white/10 disabled:opacity-60 disabled:cursor-not-allowed"
-                  title="Upload image"
-                >
-                  📷
-                </button>
-                <button
-                  type="submit"
-                  disabled={busy || !input.trim()}
-                  className="btn-press h-[44px] rounded-2xl bg-cyan-400/90 hover:bg-cyan-300 text-black px-5 text-sm font-semibold shadow-[0_0_20px_rgba(34,211,238,0.35)] disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {busy ? "Sending..." : "Send"}
-                </button>
+                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      handleImageUpload(file);
+                    }}
+                    aria-label="Upload image file"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn-press flex-1 sm:flex-none h-[44px] rounded-2xl bg-white/10 hover:bg-white/15 text-zinc-100 px-4 text-sm font-semibold border border-white/10 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                    aria-label="Upload image"
+                  >
+                    <span aria-hidden="true">📷</span>
+                    <span className="ml-2 sm:hidden">Image</span>
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={busy || !input.trim()}
+                    className="btn-press flex-1 sm:flex-none h-[44px] rounded-2xl bg-accent-bright/90 hover:bg-accent-bright text-black px-5 text-sm font-semibold shadow-lg hover:shadow-accent-bright/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                    aria-label="Send message"
+                  >
+                    {busy ? "Sending..." : "Send"}
+                  </button>
+                </div>
               </form>
             </div>
           </div>
