@@ -13,6 +13,10 @@ export default function ChatbotPage() {
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [selectedChatIndex, setSelectedChatIndex] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -97,6 +101,74 @@ export default function ChatbotPage() {
     };
   }, []);
 
+  // Load chat history on mount
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const res = await fetch("/api/history");
+        if (!res.ok) {
+          console.error("Failed to load chat history");
+          return;
+        }
+
+        const data = await res.json();
+        if (Array.isArray(data.messages) && data.messages.length > 0) {
+          setChatHistory(data.messages.reverse()); // Reverse to show newest first
+        }
+      } catch (err) {
+        console.error("Error loading chat history:", err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    }
+
+    loadHistory();
+  }, []);
+
+  function handleNewChat() {
+    setSelectedChatIndex(null);
+    setMessages([
+      {
+        role: "assistant",
+        content: "Hi! I'm your assistant. How can I help?",
+      },
+    ]);
+  }
+
+  function handleSelectChat(index) {
+    setSelectedChatIndex(index);
+    const chat = chatHistory[index];
+    if (!chat) return;
+
+    // Convert the selected chat to message format
+    const chatMessages = [
+      {
+        role: "assistant",
+        content: "Previous consultation:",
+      },
+    ];
+
+    if (chat.text) {
+      chatMessages.push({
+        role: "user",
+        content: chat.text,
+      });
+    }
+
+    if (chat.disease && Array.isArray(chat.predictions) && chat.predictions.length > 0) {
+      const top1 = chat.predictions[0];
+      chatMessages.push({
+        role: "assistant",
+        content: `Based on your symptoms, here are the prediction results:`,
+        disease: top1?.disease,
+        confidence: top1?.confidence,
+        predictions: chat.predictions,
+      });
+    }
+
+    setMessages(chatMessages);
+  }
+
   async function sendText(text) {
     const trimmed = (text || "").trim();
     if (!trimmed || busy) return;
@@ -134,6 +206,17 @@ export default function ChatbotPage() {
           history: data?.history,
         },
       ]);
+
+      // Refresh chat history after new message
+      if (top1) {
+        const histRes = await fetch("/api/history");
+        if (histRes.ok) {
+          const histData = await histRes.json();
+          if (Array.isArray(histData.messages) && histData.messages.length > 0) {
+            setChatHistory(histData.messages.reverse());
+          }
+        }
+      }
     } catch (err) {
       setMessages((cur) => [
         ...cur,
@@ -246,229 +329,380 @@ export default function ChatbotPage() {
   }
 
   return (
-    <section className="relative min-h-[calc(100dvh-4rem)] w-full flex flex-col">
+    <section className="relative min-h-[calc(100dvh-4rem)] w-full flex">
       {/* Ambient background layers */}
       <div className="noise-overlay" />
       <div className="bg-grid" />
 
-      {/* Hero: title + input */}
-      <div className="relative z-10 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pt-4">
-        <div className="relative overflow-hidden glass card rounded-[24px] px-6 py-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-wide text-white">
-            <span className="gradient-flow bg-clip-text text-transparent">AI Health Prediction System</span>
-          </h1>
-          <p className="mt-2 text-sm sm:text-base text-zinc-300">Early insights. Smarter care.</p>
+      {/* Left Sidebar */}
+      <div
+        className={`relative z-20 ${
+          sidebarOpen ? "w-64 lg:w-72" : "w-0"
+        } transition-all duration-300 overflow-hidden border-r border-white/10`}
+      >
+        <div className="h-full glass backdrop-blur-xl flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b border-white/10 flex items-center justify-between">
+            <h2 className="text-zinc-100 font-semibold">Chat History</h2>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden text-zinc-400 hover:text-zinc-100"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* New Chat Button */}
+          <div className="p-3">
+            <button
+              onClick={handleNewChat}
+              className="w-full rounded-xl bg-cyan-400/20 hover:bg-cyan-400/30 border border-cyan-400/30 text-cyan-100 px-4 py-2.5 text-sm font-medium transition-all"
+            >
+              ➕ New Chat
+            </button>
+          </div>
+
+          {/* History List */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {loadingHistory ? (
+              <div className="text-zinc-400 text-xs text-center py-4">Loading history...</div>
+            ) : chatHistory.length === 0 ? (
+              <div className="text-zinc-500 text-xs text-center py-4">No chat history yet</div>
+            ) : (
+              chatHistory.map((chat, index) => {
+                const isSelected = selectedChatIndex === index;
+                const disease = chat.predictions?.[0]?.disease || "General chat";
+                const dateStr = chat.createdAt
+                  ? new Date(chat.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : "";
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleSelectChat(index)}
+                    className={`w-full text-left rounded-xl px-3 py-2.5 transition-all ${
+                      isSelected
+                        ? "bg-cyan-400/20 border border-cyan-400/40"
+                        : "bg-white/5 hover:bg-white/10 border border-transparent"
+                    }`}
+                  >
+                    <div className="text-xs text-zinc-100 font-medium truncate">{disease}</div>
+                    <div className="text-xs text-zinc-400 mt-1 truncate">
+                      {chat.text?.substring(0, 40) || "..."}
+                    </div>
+                    {dateStr && (
+                      <div className="text-xs text-zinc-500 mt-1">{dateStr}</div>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Conversation Panel */}
-      <div className="relative z-10 max-w-[1200px] w-full mx-auto px-4 sm:px-6 pb-6 flex-1">
-        <div className="mt-6 glass card rounded-[24px] min-h-[50vh] flex flex-col">
-          <div className="border-b border-white/10 p-4 text-sm font-medium text-zinc-200">Medical Chatbot</div>
-
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28">
-            <div className="space-y-3">
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={
-                  m.role === "user"
-                    ? "ml-auto max-w-[85%] rounded-2xl bg-gradient-to-br from-cyan-400/15 to-emerald-400/10 border border-white/10 px-4 py-3 text-zinc-50 shadow-[0_10px_30px_rgba(0,0,0,0.35)] animate-slide-up"
-                    : "mr-auto max-w-[85%] rounded-2xl glass px-4 py-3 text-zinc-100 animate-slide-up"
-                }
-              >
-                {/* Assistant structured output */}
-                {m.role === "assistant" && m.disease && m.confidence && (
-                  <div className="font-bold mb-2 mt-2">
-                    Disease: {m.disease} <br />
-                    Confidence: {m.confidence}%
-                  </div>
-                )}
-
-                <p className="text-sm leading-relaxed">{m.content}</p>
-
-                {/* Prediction Results: Top 3 with circular progress rings */}
-                {m.role === "assistant" && Array.isArray(m.predictions) && m.predictions.length > 0 && (
-                  <div className="mt-3">
-                    <div className="text-sm font-medium text-zinc-200 mb-2">Prediction Results</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {m.predictions.slice(0,3).map((p, idx) => {
-                        const pct = Math.max(0, Math.min(100, Math.round(Number(p.confidence) || 0)));
-                        return (
-                          <div key={idx} className="glass-strong rounded-2xl p-3 flex items-center gap-3">
-                            <div className="ring" style={{"--p": pct}} data-p={pct}>
-                              <div className="ring-label">{pct}%</div>
-                            </div>
-                            <div>
-                              <div className="text-zinc-100 font-semibold text-sm">{p.disease}</div>
-                              <div className="text-xs text-zinc-400">Confidence</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {m.role === "assistant" && m.precautions?.diseases && (
-                  <div className="mt-3 text-sm">
-                    <div className="font-semibold mb-1">🩺 Medical Assistant</div>
-                    <div className="text-zinc-300 mb-2">Based on common symptoms, here are some possible conditions and precautions. This is not a diagnosis.</div>
-                    <div className="space-y-3">
-                      {m.precautions.diseases.map((d, idx) => {
-                        const syms = Array.isArray(d.common_symptoms) ? d.common_symptoms.slice(0, 3) : [];
-                        const precs = Array.isArray(d.precautions) ? d.precautions.slice(0, 3) : [];
-                        // Try to map a confidence from predictions if present
-                        const pred = Array.isArray(m.predictions) ? m.predictions.find(p => p.disease === d.name) : null;
-                        const confidence = pred ? Math.round(Number(pred.confidence)) : null;
-                        return (
-                          <div key={idx} className="rounded-lg bg-zinc-800/50 border border-white/10 p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-zinc-100">{d.name}</span>
-                              {confidence !== null && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${confidence < 70 ? 'bg-blue-200 text-blue-900' : confidence < 85 ? 'bg-green-200 text-green-900' : 'bg-emerald-300 text-emerald-900'}`}>Confidence: {confidence}%</span>
-                              )}
-                            </div>
-                            {syms.length > 0 && (
-                              <div className="mt-1">
-                                <strong className="text-zinc-200">Symptoms</strong>
-                                <ul className="list-disc pl-5 mt-1 text-zinc-200">
-                                  {syms.map((s, i) => (<li key={i}>{s}</li>))}
-                                </ul>
-                              </div>
-                            )}
-                            {precs.length > 0 && (
-                              <div className="mt-2">
-                                <strong className="text-zinc-200">Precautions</strong>
-                                <ul className="list-disc pl-5 mt-1 text-zinc-200">
-                                  {precs.map((p, i) => (<li key={i}>{p}</li>))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {m.precautions.disclaimer && (
-                      <div className="text-xs text-zinc-300 mt-2">{m.precautions.disclaimer}</div>
-                    )}
-                  </div>
-                )}
-
-                {m.role === "assistant" && Array.isArray(m.historyReport) && m.historyReport.length > 0 && (
-                  <div className="mt-3 text-sm">
-                    <div className="font-semibold mb-1">Last 10 predictions</div>
-                    <ul className="space-y-1">
-                      {m.historyReport.map((r, i) => (
-                        <li key={i} className="flex items-center justify-between bg-zinc-800/40 rounded-md px-3 py-1.5">
-                          <span className="text-zinc-100">{r.disease}</span>
-                          <span className="text-xs text-zinc-300">{r.count}x · max {Math.round(r.maxConfidence)}%</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {m.role === "assistant" && Array.isArray(m.history) && m.history.length > 0 && (
-                  <div className="mt-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="font-semibold mb-1">Medical History (Last 10)</div>
-                      <a
-                        href="/api/history/pdf"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs rounded-md bg-[#0fd4c3]/90 px-3 py-1 text-black hover:bg-[#0fd4c3]"
-                      >
-                        Download PDF
-                      </a>
-                    </div>
-                    <ul className="space-y-1">
-                      {m.history.map((h, i) => (
-                        <li key={i} className="bg-zinc-800/40 rounded-md px-3 py-1.5">
-                          <div className="text-zinc-300 text-xs mb-1">{h.createdAt ? new Date(h.createdAt).toLocaleString() : ''}</div>
-                          <div className="text-zinc-100">
-                            {Array.isArray(h.predictions) && h.predictions.length > 0
-                              ? h.predictions.map((p, idx) => (
-                                  <span key={idx} className="mr-2">{p.disease} ({Math.round(Number(p.confidence) || 0)}%)</span>
-                                ))
-                              : '(no predictions)'}
-                          </div>
-                          {h.text && (
-                            <div className="text-zinc-200 text-xs mt-1">Input: {h.text}</div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+      {/* Main Chat Area */}
+      <div className="relative z-10 flex-1 flex flex-col">
+        {/* Header */}
+        <div className="px-4 sm:px-6 pt-4">
+          <div className="relative overflow-hidden glass card rounded-[24px] px-6 py-6">
+            <div className="flex items-center gap-3">
+              {!sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="text-zinc-400 hover:text-zinc-100 text-xl"
+                  title="Open sidebar"
+                >
+                  ☰
+                </button>
+              )}
+              <div className="flex-1">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-wide text-white">
+                  <span className="gradient-flow bg-clip-text text-transparent">
+                    AI Health Prediction System
+                  </span>
+                </h1>
+                <p className="mt-1 text-xs sm:text-sm text-zinc-300">Early insights. Smarter care.</p>
               </div>
-            ))}
-            <div ref={bottomRef} />
             </div>
           </div>
+        </div>
 
-          <div className="sticky bottom-0 border-t border-white/10 p-3 sm:p-4 bg-[rgba(11,16,32,0.65)] backdrop-blur-xl">
-            <form onSubmit={handleSend} className="flex items-end gap-3">
-              <div className="flex-1 glass-strong rounded-2xl px-3 py-2">
-                <div className="flex items-start gap-2">
-                  <span className="mt-1 text-zinc-400">📝</span>
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend(e);
-                      }
-                    }}
-                    placeholder="Describe your symptoms..."
-                    rows={1}
-                    className="w-full resize-none bg-transparent outline-none text-zinc-100 placeholder:text-zinc-500 text-sm sm:text-base leading-relaxed"
-                  />
-                </div>
-                <div className="mt-1 flex items-center justify-between">
-                  <div className="text-xs text-zinc-400">Enter to send · Shift+Enter for new line</div>
-                  <button
-                    type="button"
-                    onClick={toggleVoice}
-                    disabled={busy || !voiceSupported}
-                    className="text-zinc-300/80 disabled:opacity-50"
-                    title={voiceSupported ? (listening ? "Stop voice input" : "Voice input") : "Voice input not supported"}
+        {/* Conversation Panel */}
+        <div className="px-4 sm:px-6 pb-6 flex-1 flex flex-col min-h-0">
+          <div className="mt-6 glass card rounded-[24px] flex-1 flex flex-col min-h-0">
+            <div className="border-b border-white/10 p-4 text-sm font-medium text-zinc-200">
+              Medical Chatbot
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28">
+              <div className="space-y-3">
+                {messages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={
+                      m.role === "user"
+                        ? "ml-auto max-w-[85%] rounded-2xl bg-gradient-to-br from-cyan-400/15 to-emerald-400/10 border border-white/10 px-4 py-3 text-zinc-50 shadow-[0_10px_30px_rgba(0,0,0,0.35)] animate-slide-up"
+                        : "mr-auto max-w-[85%] rounded-2xl glass px-4 py-3 text-zinc-100 animate-slide-up"
+                    }
                   >
-                    {listening ? "⏹" : "🎙"}
-                  </button>
-                </div>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  handleImageUpload(file);
-                }}
-              />
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => fileInputRef.current?.click()}
-                className="btn-press h-[44px] rounded-2xl bg-white/10 hover:bg-white/15 text-zinc-100 px-4 text-sm font-semibold border border-white/10 disabled:opacity-60 disabled:cursor-not-allowed"
-                title="Upload image"
-              >
-                📷
-              </button>
-              <button
-                type="submit"
-                disabled={busy || !input.trim()}
-                className="btn-press h-[44px] rounded-2xl bg-cyan-400/90 hover:bg-cyan-300 text-black px-5 text-sm font-semibold shadow-[0_0_20px_rgba(34,211,238,0.35)] disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {busy ? "Sending..." : "Send"}
-              </button>
-            </form>
-          </div>
+                    {/* Assistant structured output */}
+                    {m.role === "assistant" && m.disease && m.confidence && (
+                      <div className="font-bold mb-2 mt-2">
+                        Disease: {m.disease} <br />
+                        Confidence: {m.confidence}%
+                      </div>
+                    )}
 
+                    <p className="text-sm leading-relaxed">{m.content}</p>
+
+                    {/* Prediction Results: Top 3 with circular progress rings */}
+                    {m.role === "assistant" &&
+                      Array.isArray(m.predictions) &&
+                      m.predictions.length > 0 && (
+                        <div className="mt-3">
+                          <div className="text-sm font-medium text-zinc-200 mb-2">
+                            Prediction Results
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {m.predictions.slice(0, 3).map((p, idx) => {
+                              const pct = Math.max(
+                                0,
+                                Math.min(100, Math.round(Number(p.confidence) || 0))
+                              );
+                              return (
+                                <div
+                                  key={idx}
+                                  className="glass-strong rounded-2xl p-3 flex items-center gap-3"
+                                >
+                                  <div className="ring" style={{ "--p": pct }} data-p={pct}>
+                                    <div className="ring-label">{pct}%</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-zinc-100 font-semibold text-sm">
+                                      {p.disease}
+                                    </div>
+                                    <div className="text-xs text-zinc-400">Confidence</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                    {m.role === "assistant" && m.precautions?.diseases && (
+                      <div className="mt-3 text-sm">
+                        <div className="font-semibold mb-1">🩺 Medical Assistant</div>
+                        <div className="text-zinc-300 mb-2">
+                          Based on common symptoms, here are some possible conditions and
+                          precautions. This is not a diagnosis.
+                        </div>
+                        <div className="space-y-3">
+                          {m.precautions.diseases.map((d, idx) => {
+                            const syms = Array.isArray(d.common_symptoms)
+                              ? d.common_symptoms.slice(0, 3)
+                              : [];
+                            const precs = Array.isArray(d.precautions)
+                              ? d.precautions.slice(0, 3)
+                              : [];
+                            const pred = Array.isArray(m.predictions)
+                              ? m.predictions.find((p) => p.disease === d.name)
+                              : null;
+                            const confidence = pred ? Math.round(Number(pred.confidence)) : null;
+                            return (
+                              <div
+                                key={idx}
+                                className="rounded-lg bg-zinc-800/50 border border-white/10 p-3"
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-medium text-zinc-100">{d.name}</span>
+                                  {confidence !== null && (
+                                    <span
+                                      className={`text-xs px-2 py-0.5 rounded-full ${
+                                        confidence < 70
+                                          ? "bg-blue-200 text-blue-900"
+                                          : confidence < 85
+                                          ? "bg-green-200 text-green-900"
+                                          : "bg-emerald-300 text-emerald-900"
+                                      }`}
+                                    >
+                                      Confidence: {confidence}%
+                                    </span>
+                                  )}
+                                </div>
+                                {syms.length > 0 && (
+                                  <div className="mt-1">
+                                    <strong className="text-zinc-200">Symptoms</strong>
+                                    <ul className="list-disc pl-5 mt-1 text-zinc-200">
+                                      {syms.map((s, i) => (
+                                        <li key={i}>{s}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                                {precs.length > 0 && (
+                                  <div className="mt-2">
+                                    <strong className="text-zinc-200">Precautions</strong>
+                                    <ul className="list-disc pl-5 mt-1 text-zinc-200">
+                                      {precs.map((p, i) => (
+                                        <li key={i}>{p}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {m.precautions.disclaimer && (
+                          <div className="text-xs text-zinc-300 mt-2">
+                            {m.precautions.disclaimer}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {m.role === "assistant" &&
+                      Array.isArray(m.historyReport) &&
+                      m.historyReport.length > 0 && (
+                        <div className="mt-3 text-sm">
+                          <div className="font-semibold mb-1">Last 10 predictions</div>
+                          <ul className="space-y-1">
+                            {m.historyReport.map((r, i) => (
+                              <li
+                                key={i}
+                                className="flex items-center justify-between bg-zinc-800/40 rounded-md px-3 py-1.5"
+                              >
+                                <span className="text-zinc-100">{r.disease}</span>
+                                <span className="text-xs text-zinc-300">
+                                  {r.count}x · max {Math.round(r.maxConfidence)}%
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                    {m.role === "assistant" &&
+                      Array.isArray(m.history) &&
+                      m.history.length > 0 && (
+                        <div className="mt-3 text-sm">
+                          <div className="flex items-center justify-between">
+                            <div className="font-semibold mb-1">Medical History (Last 10)</div>
+                            <a
+                              href="/api/history/pdf"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs rounded-md bg-[#0fd4c3]/90 px-3 py-1 text-black hover:bg-[#0fd4c3]"
+                            >
+                              Download PDF
+                            </a>
+                          </div>
+                          <ul className="space-y-1">
+                            {m.history.map((h, i) => (
+                              <li key={i} className="bg-zinc-800/40 rounded-md px-3 py-1.5">
+                                <div className="text-zinc-300 text-xs mb-1">
+                                  {h.createdAt ? new Date(h.createdAt).toLocaleString() : ""}
+                                </div>
+                                <div className="text-zinc-100">
+                                  {Array.isArray(h.predictions) && h.predictions.length > 0
+                                    ? h.predictions.map((p, idx) => (
+                                        <span key={idx} className="mr-2">
+                                          {p.disease} ({Math.round(Number(p.confidence) || 0)}%)
+                                        </span>
+                                      ))
+                                    : "(no predictions)"}
+                                </div>
+                                {h.text && (
+                                  <div className="text-zinc-200 text-xs mt-1">
+                                    Input: {h.text}
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                  </div>
+                ))}
+                <div ref={bottomRef} />
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 border-t border-white/10 p-3 sm:p-4 bg-[rgba(11,16,32,0.65)] backdrop-blur-xl">
+              <form onSubmit={handleSend} className="flex items-end gap-3">
+                <div className="flex-1 glass-strong rounded-2xl px-3 py-2">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-1 text-zinc-400">📝</span>
+                    <textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend(e);
+                        }
+                      }}
+                      placeholder="Describe your symptoms..."
+                      rows={1}
+                      className="w-full resize-none bg-transparent outline-none text-zinc-100 placeholder:text-zinc-500 text-sm sm:text-base leading-relaxed"
+                    />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <div className="text-xs text-zinc-400">
+                      Enter to send · Shift+Enter for new line
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleVoice}
+                      disabled={busy || !voiceSupported}
+                      className="text-zinc-300/80 disabled:opacity-50"
+                      title={
+                        voiceSupported
+                          ? listening
+                            ? "Stop voice input"
+                            : "Voice input"
+                          : "Voice input not supported"
+                      }
+                    >
+                      {listening ? "⏹" : "🎙"}
+                    </button>
+                  </div>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    handleImageUpload(file);
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn-press h-[44px] rounded-2xl bg-white/10 hover:bg-white/15 text-zinc-100 px-4 text-sm font-semibold border border-white/10 disabled:opacity-60 disabled:cursor-not-allowed"
+                  title="Upload image"
+                >
+                  📷
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy || !input.trim()}
+                  className="btn-press h-[44px] rounded-2xl bg-cyan-400/90 hover:bg-cyan-300 text-black px-5 text-sm font-semibold shadow-[0_0_20px_rgba(34,211,238,0.35)] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {busy ? "Sending..." : "Send"}
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
     </section>
