@@ -2,22 +2,22 @@
 
 :root {
   /* Core palette */
-  --background: #0b1020; /* dark navy */
-  --background-2: #0e1426; /* charcoal navy */
-  --foreground: #e6f4f1; /* soft off-white with slight cyan tint */
-  --accent: #0f766e;     /* dark teal */
-  --accent-strong: #06b6d4; /* cyan-teal */
-  --accent-bright: #0fd4c3; /* bright cyan - primary button color */
-  --accent-bright-hover: #0bc4b3; /* bright cyan hover */
-  --accent-emerald: #10b981; /* emerald */
-  --mint: #99f6e4;
+  --background: #000000; /* pure black for deep contrast */
+  --background-2: #0f0f0f; /* very dark grey for layering */
+  --foreground: #ffffff; /* crisp white text */
+  --accent: #ffffff;     /* white as primary accent, buttons will invert */
+  --accent-strong: #dddddd; /* light grey for subtle emphasis */
+  --accent-bright: #ffffff; /* white - used by call‑to‑actions */
+  --accent-bright-hover: #f0f0f0; /* slight off‑white hover */
+  --accent-emerald: #bbbbbb; /* muted grey tone */
+  --mint: #ffffff;
   --amber-warn: #f59e0b;
 
   /* Glass + glow */
-  --glass-bg: rgba(18, 26, 46, 0.45);
-  --glass-border: rgba(255,255,255,.08);
-  --glass-inner: rgba(255,255,255,.04);
-  --glow-cyan: 0 0 24px rgba(6, 182, 212, 0.28);
+  --glass-bg: rgba(0, 0, 0, 0.6);
+  --glass-border: rgba(255,255,255,.12);
+  --glass-inner: rgba(255,255,255,.06);
+  --glow-cyan: 0 0 24px rgba(255, 255, 255, 0.2);
 }
 
 /* Generic animation utilities */

@@ -27,59 +27,26 @@ export default async function RootLayout({ children }) {
       <body
         className={`${inter.variable} ${GeistMono.variable} antialiased`}
       >
-        <header className="sticky top-0 z-50 animate-fade-in py-4">
-          {/* Outer wrapper (full width) with equal side spacing */}
-          <div className="w-full px-4 md:px-6">
-            {/* Centered navbar div (fixed max-width, rounded) */}
-            <div className="mx-auto max-w-[1200px] h-16 glass rounded-full px-4 sm:px-6 flex items-center justify-between shadow-lg">
-              {/* Left: Logo */}
-              <Link href="/" className="flex items-center gap-3">
-                <span className="text-sm font-semibold tracking-wide text-accent-bright/90 hover:text-accent-bright transition-colors">AI-Symptom</span>
-              </Link>
-              {/* Right: Menu */}
-              <nav className="flex items-center gap-4 sm:gap-6 text-sm sm:text-base font-semibold">
-                <Link
-                  href="/"
-                  className="text-accent-bright/90 hover:text-white hover:underline underline-offset-4 decoration-accent-emerald/60 transition-colors hover-lift"
-                  aria-label="Home page"
-                >
-                  Home
-                </Link>
-                <Link
-                  href="/chatbot"
-                  className="text-accent-bright/90 hover:text-white hover:underline underline-offset-4 decoration-accent-emerald/60 transition-colors hover-lift"
-                  aria-label="Chatbot page"
-                >
-                  Chatbot
-                </Link>
-                <Link
-                  href="/contact"
-                  className="text-accent-bright/90 hover:text-white hover:underline underline-offset-4 decoration-accent-emerald/60 transition-colors hover-lift"
-                  aria-label="Contact page"
-                >
-                  Contact
-                </Link>
+        <header className="sticky top-0 z-50 py-4 bg-black/40 backdrop-blur animate-fade-in">
+          <div className="w-full px-6">
+            <div className="mx-auto max-w-[1200px] flex items-center justify-between h-16">
+              {/* logo */}
+              <Link href="/" className="text-xl font-bold text-white hover:opacity-90 transition-opacity">AI-Symptom</Link>
+              {/* simple nav */}
+              <nav className="flex items-center gap-6 text-sm font-medium">
+                <Link href="/" className="text-white hover:opacity-90 transition-opacity">Home</Link>
+                <Link href="/chatbot" className="text-white hover:opacity-90 transition-opacity">Chatbot</Link>
+                <Link href="/contact" className="text-white hover:opacity-90 transition-opacity">Contact</Link>
                 <Link
                   href="/login"
-                  className="text-accent-bright/90 hover:text-white hover:underline underline-offset-4 decoration-accent-emerald/60 transition-colors hover-lift"
-                  aria-label={session?.user ? "User account" : "Login page"}
+                  className="ml-4 inline-block rounded-full bg-accent-bright text-black px-4 py-1.5 text-sm font-semibold hover:bg-accent-bright/90 transition-colors"
                 >
                   {session?.user ? (
-                  <div className="flex items-center gap-2 max-w-[12rem] lg:max-w-[16rem]">
-                    {session.user.image ? (
-                      <img
-                        src={session.user.image}
-                        alt={session.user.name ?? "User"}
-                        className="h-8 w-8 rounded-full border border-white/20 object-cover"
-                      />
-                    ) : (
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-accent-bright/90 text-sm font-semibold">
-                        {(session.user.name?.[0] ?? "U").toUpperCase()}
-                      </span>
-                    )}
-                    <span className="text-accent-bright/90 truncate text-sm">{session.user.name ?? session.user.email ?? "Account"}</span>
-                  </div>
-                ) : "Login"}</Link>
+                    <span>Account</span>
+                  ) : (
+                    <span>Login</span>
+                  )}
+                </Link>
               </nav>
             </div>
           </div>

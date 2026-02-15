@@ -1,26 +1,62 @@
+"use client";
+import { useEffect } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
 export default function Home() {
+  useEffect(() => {
+    gsap.registerPlugin(ScrollTrigger);
+
+    
+    gsap.utils.toArray(".scroll-animate").forEach((elem) => {
+      gsap.from(elem, {
+        opacity: 0,
+        y: 50,
+        duration: 0.8,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: elem,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      });
+    });
+
+    // simple hero headline animation
+    gsap.from(".hero-head", {
+      opacity: 0,
+      y: -40,
+      duration: 1.2,
+      ease: "power2.out",
+    });
+  }, []);
+
   return (
     <div className="space-y-20 sm:space-y-24 px-4 py-8">
       {/* Hero Section */}
-      <section className="pt-6 sm:pt-10 animate-fade-in">
-        <div className="mx-auto max-w-6xl text-center">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-transparent bg-clip-text gradient-flow animate-slide-up">
+      <section className="relative flex items-center justify-center h-[80vh] md:h-[90vh] bg-cover bg-center
+                        animate-fade-in scroll-animate"
+               style={{ backgroundImage: "url('/hero-bg.jpg')" }}
+      >
+        <div className="absolute inset-0 bg-black/50"></div>
+        <div className="relative z-10 max-w-3xl text-center px-4">
+          <h1 className="hero-head text-5xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-tight">
             AI Symptom to Disease Predictor
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-base text-zinc-300 sm:text-lg leading-relaxed">
+          <p className="mt-4 text-lg text-zinc-300">
             Describe your symptoms in natural language and get AI-assisted guidance. Fast, simple, and designed for clarity.
-            <span className="block mt-2 text-sm text-zinc-400">Not a substitute for professional medical advice.</span>
           </p>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <span className="block mt-2 text-sm text-zinc-400">Not a substitute for professional medical advice.</span>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
               href="/chatbot"
-              className="w-full sm:w-auto rounded-full bg-accent-bright/90 text-black px-8 py-3.5 text-sm font-semibold hover:bg-accent-bright hover:shadow-lg hover:shadow-accent-bright/30 transition-all btn-press"
+              className="inline-block rounded-full bg-accent-bright text-black px-8 py-3.5 text-base font-semibold hover:bg-accent-bright/90 transition-all"
             >
               Start Diagnosis
             </a>
             <a
               href="/contact"
-              className="w-full sm:w-auto rounded-full border border-white/15 px-8 py-3.5 text-sm font-semibold text-accent-bright/90 hover:bg-white/10 hover:border-accent-bright/40 transition-all btn-press"
+              className="inline-block rounded-full border border-white/30 px-8 py-3.5 text-base font-semibold text-white hover:bg-white/10 transition-all"
             >
               Contact Us
             </a>
@@ -29,7 +65,7 @@ export default function Home() {
       </section>
 
       {/* How It Works */}
-      <section className="animate-slide-up">
+      <section className="animate-slide-up scroll-animate">
         <div className="mx-auto max-w-6xl">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">
             <span className="gradient-flow bg-clip-text text-transparent">How It Works</span>
@@ -67,7 +103,7 @@ export default function Home() {
       </section>
 
       {/* Key Features */}
-      <section>
+      <section className="scroll-animate">
         <div className="mx-auto max-w-6xl">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">
             <span className="gradient-flow bg-clip-text text-transparent">Key Features</span>
@@ -120,7 +156,7 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="pb-8 sm:pb-12">
+      <section className="pb-8 sm:pb-12 scroll-animate">
         <div className="mx-auto max-w-4xl">
           <div className="glass rounded-3xl p-8 sm:p-10 text-center hover-lift transition-all">
             <h3 className="text-xl sm:text-2xl font-semibold text-white mb-3">
