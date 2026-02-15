@@ -15,7 +15,7 @@ export async function GET() {
 
     // Fetch the chat document for this user
     const chatDoc = await Chat.findOne({ userId })
-      .select({ messages: { $slice: -20 } }) // Get last 20 messages
+      .select({ messages: { $slice: -40 } }) // Get last 40 messages (20 conversations)
       .lean();
 
     if (!chatDoc || !Array.isArray(chatDoc.messages) || chatDoc.messages.length === 0) {

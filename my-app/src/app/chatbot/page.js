@@ -13,10 +13,6 @@ export default function ChatbotPage() {
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(true);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-  const [chatHistory, setChatHistory] = useState([]);
-  const [selectedChatIndex, setSelectedChatIndex] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -101,74 +97,6 @@ export default function ChatbotPage() {
     };
   }, []);
 
-  // Load chat history on mount
-  useEffect(() => {
-    async function loadHistory() {
-      try {
-        const res = await fetch("/api/history");
-        if (!res.ok) {
-          console.error("Failed to load chat history");
-          return;
-        }
-
-        const data = await res.json();
-        if (Array.isArray(data.messages) && data.messages.length > 0) {
-          setChatHistory(data.messages.reverse()); // Reverse to show newest first
-        }
-      } catch (err) {
-        console.error("Error loading chat history:", err);
-      } finally {
-        setLoadingHistory(false);
-      }
-    }
-
-    loadHistory();
-  }, []);
-
-  function handleNewChat() {
-    setSelectedChatIndex(null);
-    setMessages([
-      {
-        role: "assistant",
-        content: "Hi! I'm your assistant. How can I help?",
-      },
-    ]);
-  }
-
-  function handleSelectChat(index) {
-    setSelectedChatIndex(index);
-    const chat = chatHistory[index];
-    if (!chat) return;
-
-    // Convert the selected chat to message format
-    const chatMessages = [
-      {
-        role: "assistant",
-        content: "Previous consultation:",
-      },
-    ];
-
-    if (chat.text) {
-      chatMessages.push({
-        role: "user",
-        content: chat.text,
-      });
-    }
-
-    if (chat.disease && Array.isArray(chat.predictions) && chat.predictions.length > 0) {
-      const top1 = chat.predictions[0];
-      chatMessages.push({
-        role: "assistant",
-        content: `Based on your symptoms, here are the prediction results:`,
-        disease: top1?.disease,
-        confidence: top1?.confidence,
-        predictions: chat.predictions,
-      });
-    }
-
-    setMessages(chatMessages);
-  }
-
   async function sendText(text) {
     const trimmed = (text || "").trim();
     if (!trimmed || busy) return;
@@ -187,9 +115,6 @@ export default function ChatbotPage() {
       if (!res.ok) throw new Error("API error");
 
       const data = await res.json();
-      console.log("/api/chat response:", data);
-      console.log("Predictions:", data?.predictions);
-      console.log("Precautions:", data?.precautions);
 
       const top1 = Array.isArray(data?.predictions) && data.predictions.length > 0 ? data.predictions[0] : null;
 
@@ -206,17 +131,6 @@ export default function ChatbotPage() {
           history: data?.history,
         },
       ]);
-
-      // Refresh chat history after new message
-      if (top1) {
-        const histRes = await fetch("/api/history");
-        if (histRes.ok) {
-          const histData = await histRes.json();
-          if (Array.isArray(histData.messages) && histData.messages.length > 0) {
-            setChatHistory(histData.messages.reverse());
-          }
-        }
-      }
     } catch (err) {
       setMessages((cur) => [
         ...cur,
@@ -329,86 +243,10 @@ export default function ChatbotPage() {
   }
 
   return (
-    <section className="relative min-h-[calc(100dvh-6rem)] w-full flex">
+    <section className="relative min-h-[calc(100dvh-6rem)] w-full flex flex-col">
       {/* Ambient background layers */}
       <div className="noise-overlay" />
       <div className="bg-grid" />
-
-      {/* Left Sidebar */}
-      <div
-        className={`relative z-20 ${
-          sidebarOpen ? "w-64 lg:w-80" : "w-0"
-        } transition-all duration-300 ease-in-out overflow-hidden border-r border-white/10`}
-      >
-        <div className="h-full glass backdrop-blur-xl flex flex-col min-w-[16rem] lg:min-w-[20rem]">
-          {/* Sidebar Header */}
-          <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <h2 className="text-zinc-100 font-semibold text-sm">Chat History</h2>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="md:hidden text-zinc-400 hover:text-zinc-100 transition-colors p-1"
-              aria-label="Close sidebar"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* New Chat Button */}
-          <div className="p-3">
-            <button
-              onClick={handleNewChat}
-              className="w-full rounded-xl bg-accent-bright/20 hover:bg-accent-bright/30 border border-accent-bright/30 text-accent-bright px-4 py-2.5 text-sm font-medium transition-all btn-press"
-              aria-label="Start new chat"
-            >
-              ➕ New Chat
-            </button>
-          </div>
-
-          {/* History List */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {loadingHistory ? (
-              <div className="text-zinc-400 text-xs text-center py-4 animate-pulse">
-                <div className="inline-block h-4 w-4 border-2 border-accent-bright border-t-transparent rounded-full animate-spin mr-2"></div>
-                Loading history...
-              </div>
-            ) : chatHistory.length === 0 ? (
-              <div className="text-zinc-500 text-xs text-center py-4">No chat history yet</div>
-            ) : (
-              chatHistory.map((chat, index) => {
-                const isSelected = selectedChatIndex === index;
-                const disease = chat.predictions?.[0]?.disease || "General chat";
-                const dateStr = chat.createdAt
-                  ? new Date(chat.createdAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })
-                  : "";
-
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleSelectChat(index)}
-                    className={`w-full text-left rounded-xl px-3 py-2.5 transition-all btn-press ${
-                      isSelected
-                        ? "bg-accent-bright/20 border border-accent-bright/40"
-                        : "bg-white/5 hover:bg-white/10 border border-transparent"
-                    }`}
-                    aria-label={`View chat about ${disease}`}
-                  >
-                    <div className="text-xs text-zinc-100 font-medium truncate">{disease}</div>
-                    <div className="text-xs text-zinc-400 mt-1 truncate">
-                      {chat.text?.substring(0, 40) || "..."}
-                    </div>
-                    {dateStr && (
-                      <div className="text-xs text-zinc-500 mt-1">{dateStr}</div>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Main Chat Area */}
       <div className="relative z-10 flex-1 flex flex-col min-w-0">
@@ -416,15 +254,6 @@ export default function ChatbotPage() {
         <div className="px-4 sm:px-6 pt-4">
           <div className="relative overflow-hidden glass card rounded-[24px] px-6 py-6">
             <div className="flex items-center gap-3">
-              {!sidebarOpen && (
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="text-zinc-400 hover:text-zinc-100 text-xl"
-                  title="Open sidebar"
-                >
-                  ☰
-                </button>
-              )}
               <div className="flex-1">
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-wide text-white">
                   <span className="gradient-flow bg-clip-text text-transparent">

@@ -7,11 +7,22 @@ const ChatSchema = new mongoose.Schema({
         required: true
     },
     messages: [{
+        role: {
+            type: String,
+            enum: ['user', 'assistant']
+        },
+        content: String,
         text: String,
         disease: String,
         confidence: Number,
-        createdAt : { type: Date, default: Date.now }
-    }] 
+        predictions: [{
+            disease: String,
+            confidence: Number
+        }],
+        precautions: mongoose.Schema.Types.Mixed,
+        historyReport: mongoose.Schema.Types.Mixed,
+        createdAt: { type: Date, default: Date.now }
+    }]
 });
 
 const chatModel = mongoose.models.Chat || mongoose.model("Chat", ChatSchema);

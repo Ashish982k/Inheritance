@@ -241,6 +241,7 @@ User message:
 
       const last10 = history.messages || [];
       const historyText = last10
+        .filter(m => Array.isArray(m.predictions) && m.predictions.length > 0)
         .map((m, i) =>
           `${i + 1}. ${m.predictions
             .map(p => `${p.disease} (${p.confidence}%)`)
@@ -270,8 +271,11 @@ If not available, clearly say so.
       return NextResponse.json({
         reply: historyReply,
         history: last10.map(m => ({
+          role: m.role,
+          content: m.content,
           text: m.text,
           predictions: m.predictions,
+          precautions: m.precautions,
           createdAt: m.createdAt
         }))
       });
@@ -330,7 +334,7 @@ If not available, clearly say so.
     const top3 = (chosenSource === "gemini" && geminiTop3.length > 0) ? geminiTop3 : mlTop3;
     console.log("Chosen source:", chosenSource, "Top3:", top3);
 
-    /* ---------- SAVE HISTORY ---------- */
+    /* ---------- SAVE USER MESSAGE TO HISTORY ---------- */
     const session = await auth();
     const userId = session?.user?.id;
 
@@ -342,8 +346,9 @@ If not available, clearly say so.
           {
             $push: {
               messages: {
+                role: 'user',
+                content: message,
                 text: englishMessage,
-                predictions: top3,
                 createdAt: new Date()
               }
             }
@@ -351,7 +356,7 @@ If not available, clearly say so.
           { upsert: true }
         );
       } catch (e) {
-        console.error("MongoDB write failed (save history):", e);
+        console.error("MongoDB write failed (save user message):", e);
       }
     }
 
@@ -430,6 +435,30 @@ Rules:
       }
     } catch (e) {
       console.warn("Failed to build last-10 predictions report:", e?.message || e);
+    }
+
+    /* ---------- SAVE ASSISTANT RESPONSE TO HISTORY ---------- */
+    if (userId && top3.length > 0) {
+      try {
+        await connectDB();
+        await chatModel.updateOne(
+          { userId },
+          {
+            $push: {
+              messages: {
+                role: 'assistant',
+                content: summaryReply,
+                predictions: top3,
+                precautions,
+                historyReport,
+                createdAt: new Date()
+              }
+            }
+          }
+        );
+      } catch (e) {
+        console.error("MongoDB write failed (save assistant response):", e);
+      }
     }
 
     /* ---------- FINAL RESPONSE ---------- */
